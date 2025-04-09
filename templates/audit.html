@@ -527,6 +527,14 @@
             })
             .catch(error => {
                 console.error('Erro ao marcar setup como auditado:', error);
+                // Exibir mais detalhes do erro para debug
+                console.log('Detalhes da requisição:', {
+                    'cell_name': cellName,
+                    'order_number': orderNumber,
+                    'setup_type': setupType,
+                    'audited': markAs,
+                    'notes': auditNotes
+                });
                 const errorAlert = `
                     <div class="alert alert-danger alert-dismissible fade show">
                         <i class="fa fa-exclamation-circle me-2"></i> Erro ao processar requisição. Tente novamente.
@@ -590,6 +598,12 @@
             })
             .catch(error => {
                 console.error('Erro ao excluir setup:', error);
+                // Exibir mais detalhes do erro para debug
+                console.log('Detalhes da requisição para excluir:', {
+                    'cell_name': cellName,
+                    'order_number': orderNumber,
+                    'setup_type': setupType
+                });
                 const errorAlert = `
                     <div class="alert alert-danger alert-dismissible fade show">
                         <i class="fa fa-exclamation-circle me-2"></i> Erro ao processar requisição. Tente novamente.
@@ -827,9 +841,16 @@
             detailsModal.show();
             
             // Carregar imagens do setup
+            console.log('Iniciando carregamento de imagens para:', setupData.cellName, setupData.orderNumber, setupData.setupType);
+            
             fetch(`/get_setup_images/${setupData.cellName}/${setupData.orderNumber}/${setupData.setupType}`)
-            .then(response => response.json())
+            .then(response => {
+                console.log('Resposta recebida:', response.status);
+                return response.json();
+            })
             .then(data => {
+                console.log('Dados recebidos da API de imagens:', data);
+                
                 if (data.success && data.images && data.images.length > 0) {
                     // Criar carrossel para as imagens
                     let carouselHTML = `
