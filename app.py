@@ -1847,6 +1847,41 @@ def get_photo(cell_name, filepath):
         # Compatibilidade com formato antigo
         return send_from_directory(cell_dir, filepath)
 
+@app.route('/api/check_images/<cell_name>/<order_number>/<setup_type>')
+def check_setup_images(cell_name, order_number, setup_type):
+    """API para verificar imagens de um setup específico.
+    
+    Verifica se existem imagens para um setup, tanto no formato único quanto múltiplo.
+    
+    Args:
+        cell_name: Nome da célula
+        order_number: Número da ordem
+        setup_type: Tipo de setup (supply ou removal)
+    
+    Returns:
+        JSON com lista de caminhos de imagens encontradas
+    """
+    # Verificar se existe um diretório com múltiplas imagens
+    setup_dir_name = f"{order_number}_{setup_type}"
+    setup_dir_path = os.path.join(DATA_DIR, cell_name, setup_dir_name)
+    
+    images = []
+    
+    # Verificar se existe o diretório e listar imagens
+    if os.path.exists(setup_dir_path) and os.path.isdir(setup_dir_path):
+        for filename in os.listdir(setup_dir_path):
+            if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                image_path = f"/photos/{cell_name}/{setup_dir_name}/{filename}"
+                images.append(image_path)
+    else:
+        # Verificar se existe a imagem única
+        image_path = f"{setup_dir_name}.jpg"
+        full_path = os.path.join(DATA_DIR, cell_name, image_path)
+        if os.path.exists(full_path) and os.path.isfile(full_path):
+            images.append(f"/photos/{cell_name}/{image_path}")
+    
+    return jsonify({"success": True, "images": images})
+
 def reset_cell_flow(cell_name, reason):
     """Reset the flow of a cell without deleting records.
     
