@@ -124,6 +124,25 @@ document.addEventListener('DOMContentLoaded', function() {
         orderNumber.addEventListener('input', function() {
             formValidationState.orderNumber = !!this.value.trim();
             validateForm();
+            
+            // Validação adicional para o botão de retirada
+            const finalizeRemovalButton = document.getElementById('finalizeRemovalButton');
+            if (finalizeRemovalButton && setupType && setupType.value === 'removal') {
+                const hasOrderNumber = !!this.value.trim();
+                const photoValid = !!photoData.value;
+                const verificationValid = verificationCheck.checked;
+                
+                // Para retirada, só precisamos de ordem, foto e verificação
+                const canFinalizeRemoval = hasOrderNumber && photoValid && verificationValid;
+                finalizeRemovalButton.disabled = !canFinalizeRemoval;
+                
+                console.log("[SETUP-VALIDATION] Validação de botão de retirada (ordem):", {
+                    hasOrderNumber,
+                    photoValid,
+                    verificationValid,
+                    canFinalizeRemoval
+                });
+            }
         });
     }
     
@@ -145,6 +164,25 @@ document.addEventListener('DOMContentLoaded', function() {
         photoInput.addEventListener('change', function() {
             formValidationState.photo = this.files.length > 0;
             validateForm();
+            
+            // Validação adicional para botão de retirada
+            const finalizeRemovalButton = document.getElementById('finalizeRemovalButton');
+            if (finalizeRemovalButton && setupType && setupType.value === 'removal') {
+                const hasOrderNumber = !!orderNumber.value.trim();
+                const photoValid = this.files.length > 0;
+                const verificationValid = verificationCheck.checked;
+                
+                // Para retirada, só precisamos de ordem, foto e verificação
+                const canFinalizeRemoval = hasOrderNumber && photoValid && verificationValid;
+                finalizeRemovalButton.disabled = !canFinalizeRemoval;
+                
+                console.log("[SETUP-VALIDATION] Validação de botão de retirada (foto):", {
+                    hasOrderNumber,
+                    photoValid,
+                    verificationValid,
+                    canFinalizeRemoval
+                });
+            }
         });
         
         // Verificar também quando os dados da foto são atualizados (via data URL)
@@ -152,6 +190,25 @@ document.addEventListener('DOMContentLoaded', function() {
             const photoDataObserver = new MutationObserver(function() {
                 formValidationState.photo = !!photoData.value;
                 validateForm();
+                
+                // Validação adicional para botão de retirada
+                const finalizeRemovalButton = document.getElementById('finalizeRemovalButton');
+                if (finalizeRemovalButton && setupType && setupType.value === 'removal') {
+                    const hasOrderNumber = !!orderNumber.value.trim();
+                    const photoValid = !!photoData.value;
+                    const verificationValid = verificationCheck.checked;
+                    
+                    // Para retirada, só precisamos de ordem, foto e verificação
+                    const canFinalizeRemoval = hasOrderNumber && photoValid && verificationValid;
+                    finalizeRemovalButton.disabled = !canFinalizeRemoval;
+                    
+                    console.log("[SETUP-VALIDATION] Validação de botão de retirada (photoData):", {
+                        hasOrderNumber,
+                        photoValid,
+                        verificationValid,
+                        canFinalizeRemoval
+                    });
+                }
             });
             
             photoDataObserver.observe(photoData, { attributes: true });
@@ -163,6 +220,25 @@ document.addEventListener('DOMContentLoaded', function() {
         verificationCheck.addEventListener('change', function() {
             formValidationState.verification = this.checked;
             validateForm();
+            
+            // Validação adicional para o botão de retirada
+            const finalizeRemovalButton = document.getElementById('finalizeRemovalButton');
+            if (finalizeRemovalButton && setupType && setupType.value === 'removal') {
+                const hasOrderNumber = !!orderNumber.value;
+                const photoValid = !!photoData.value;
+                const verificationValid = this.checked;
+                
+                // Para retirada, só precisamos de ordem, foto e verificação
+                const canFinalizeRemoval = hasOrderNumber && photoValid && verificationValid;
+                finalizeRemovalButton.disabled = !canFinalizeRemoval;
+                
+                console.log("[SETUP-VALIDATION] Validação de botão de retirada:", {
+                    hasOrderNumber,
+                    photoValid,
+                    verificationValid,
+                    canFinalizeRemoval
+                });
+            }
         });
     }
     

@@ -280,11 +280,21 @@
                                     </div>
                                 </div>
                                 
-                                <!-- Submit Button -->
-                                <div class="text-center">
+                                <!-- Submit Button para Supply -->
+                                <div class="text-center" id="supplySubmitContainer">
                                     <button type="submit" id="finalizeButton" class="btn btn-success" disabled>
                                         <i class="fa fa-check me-2"></i> Finalizar Cadastro
                                     </button>
+                                </div>
+                                
+                                <!-- Submit Button para Removal - Este botão NÃO depende da validação de produtos -->
+                                <div class="text-center" id="removalSubmitContainer" style="display: none;">
+                                    <button type="submit" id="finalizeRemovalButton" class="btn btn-success">
+                                        <i class="fa fa-check me-2"></i> Finalizar Retirada
+                                    </button>
+                                    <div class="small text-muted mt-1">
+                                        Depois de preencher número da ordem, foto e marcar a verificação, clique para finalizar
+                                    </div>
                                 </div>
                                 
                                 <!-- Log de status (apenas para debug) -->
@@ -645,6 +655,10 @@
                         field.style.display = 'none';
                     });
                     
+                    // Configurar botões específicos para retirada
+                    document.getElementById('supplySubmitContainer').style.display = 'none';
+                    document.getElementById('removalSubmitContainer').style.display = 'block';
+                    
                     // Mostrar formulário e esconder seleção
                     setupTypeSelectionContainer.style.display = 'none';
                     setupFormContainer.style.display = 'block';
@@ -655,6 +669,8 @@
                     
                     // Disparar evento para atualizar validação
                     typeInput.dispatchEvent(new Event('change'));
+                    
+                    console.log("[SETUP] Formulário configurado para retirada");
                 });
                 
                 setupTypeSupplyBtn.addEventListener('click', function() {
@@ -666,11 +682,21 @@
                     operatorLabel.textContent = 'Abastecedor';
                     verificationLabel.textContent = 'Confirmo que verifiquei e abasteci todos os materiais necessários';
                     
-                    // Se temos um número de ordem já digitado, preencher o campo
+                    // Mostrar campos de produtos para abastecimento
+                    const supplyFields = document.querySelectorAll('.supply-fields');
+                    supplyFields.forEach(field => {
+                        field.style.display = 'block';
+                    });
+                    
+                    // Configurar botões específicos para abastecimento
+                    document.getElementById('supplySubmitContainer').style.display = 'block';
+                    document.getElementById('removalSubmitContainer').style.display = 'none';
                     
                     // Mostrar formulário e esconder seleção
                     setupTypeSelectionContainer.style.display = 'none';
                     setupFormContainer.style.display = 'block';
+                    
+                    console.log("[SETUP] Formulário configurado para abastecimento");
                 });
             }
             
