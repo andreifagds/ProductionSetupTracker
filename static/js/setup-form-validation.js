@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
         supplierName: false,
         photo: false,
         verification: false,
-        product: true,  // Por padrão verdadeiro, só é necessário para supply
+        product: false,  // Inicialmente falso, será validado conforme o tipo
         items: true     // Por padrão verdadeiro, só é necessário para supply
     };
     
@@ -47,12 +47,57 @@ document.addEventListener('DOMContentLoaded', function() {
             // Produto é obrigatório
             formValidationState.product = !!productCode.value && !!productName.value;
             
+            // Adicionar feedback visual para o campo de produto
+            const productSelectionElement = document.getElementById('productSelection');
+            const productCodeElement = document.getElementById('productCode');
+            
+            if (formValidationState.product) {
+                // Produtos válidos
+                productSelectionElement.classList.remove('is-invalid');
+                productSelectionElement.classList.add('is-valid');
+                productCodeElement.classList.remove('is-invalid');
+                productCodeElement.classList.add('is-valid');
+                
+                // Atualizar mensagem de ajuda
+                const productHelp = document.getElementById('productHelp');
+                if (productHelp) {
+                    productHelp.classList.remove('text-danger');
+                    productHelp.textContent = 'Produto selecionado corretamente.';
+                }
+            } else {
+                // Produtos inválidos
+                productSelectionElement.classList.add('is-invalid');
+                productSelectionElement.classList.remove('is-valid');
+                productCodeElement.classList.add('is-invalid');
+                productCodeElement.classList.remove('is-valid');
+                
+                // Atualizar mensagem de ajuda
+                const productHelp = document.getElementById('productHelp');
+                if (productHelp) {
+                    productHelp.classList.add('text-danger');
+                    productHelp.textContent = 'É obrigatório selecionar um produto para o abastecimento.';
+                }
+            }
+            
             // Validar se os itens do produto estão completos
             validateSelectedItems();
         } else {
             // Para retirada (removal), esses campos não são obrigatórios
             formValidationState.product = true;
             formValidationState.items = true;
+            
+            // Remover feedback visual para campos que não são necessários
+            const productSelectionElement = document.getElementById('productSelection');
+            const productCodeElement = document.getElementById('productCode');
+            if (productSelectionElement) productSelectionElement.classList.remove('is-invalid', 'is-valid');
+            if (productCodeElement) productCodeElement.classList.remove('is-invalid', 'is-valid');
+            
+            // Restaurar mensagem de ajuda
+            const productHelp = document.getElementById('productHelp');
+            if (productHelp) {
+                productHelp.classList.remove('text-danger');
+                productHelp.textContent = 'Selecione ou digite o código do produto para esta célula.';
+            }
         }
         
         // Verificar todos os campos obrigatórios

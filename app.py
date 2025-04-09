@@ -1242,20 +1242,22 @@ def setup():
         # Validação básica
         required_fields = [cell_name, order_number]
         
-        # Validação específica para abastecimento
-        if setup_type == 'supply':
-            if product_code and product_name:
-                # Adicionar validação extra para produtos e itens
-                pass  # Opcional: validação adicional
-        
         # Para todos os tipos, verificar o nome do abastecedor
         if not supplier_name:
             supplier_name = username
             required_fields.append(supplier_name)
             
+        # Validação específica para abastecimento
+        if setup_type == 'supply':
+            # Produto é obrigatório para operações de abastecimento
+            if not product_code or not product_name:
+                flash('Para registros de abastecimento, é obrigatório selecionar um produto.', 'danger')
+                return redirect(url_for('setup', qrcode=qrcode))
+        
+        # Validar campos básicos
         if not all(required_fields):
             flash('Todos os campos obrigatórios devem ser preenchidos', 'danger')
-            return redirect(url_for('setup'))
+            return redirect(url_for('setup', qrcode=qrcode))
         
         # Converter string JSON para lista de imagens, se for JSON
         try:
