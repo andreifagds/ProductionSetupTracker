@@ -554,9 +554,12 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Elementos do formulário
             const photoInput = document.getElementById('photoInput');
-            const imagePreview = document.getElementById('imagePreview');
+            const carouselInner = document.getElementById('carouselInner');
             const photoData = document.getElementById('photoData');
             const finalizeButton = document.getElementById('finalizeButton');
+            
+            // Variáveis para o carousel
+            let uploadedImages = [];
             const setupTypeSelectionContainer = document.getElementById('setupTypeSelectionContainer');
             const setupFormContainer = document.getElementById('setupFormContainer');
             const setupTypeRemovalBtn = document.getElementById('setupTypeRemoval');
@@ -703,65 +706,128 @@
             // Setup file input and preview handling
             if (photoInput) {
                 photoInput.addEventListener('change', async function() {
-                    const file = this.files[0];
-                    if (file) {
-                        // Criar uma imagem temporária para redimensionamento
-                        const img = new Image();
-                        const reader = new FileReader();
+                    // Limpar o carousel e a lista de imagens se houver uma nova seleção
+                    if (this.files.length > 0) {
+                        // Remover o placeholder e preparar o carousel
+                        carouselInner.innerHTML = '';
+                        uploadedImages = [];
                         
-                        reader.onload = function(e) {
-                            img.src = e.target.result;
-                        }
+                        // Processar cada arquivo
+                        const files = Array.from(this.files);
                         
-                        img.onload = function() {
-                            // Criar canvas para redimensionamento
-                            const canvas = document.createElement('canvas');
-                            const MAX_WIDTH = 800;
-                            const MAX_HEIGHT = 800;
+                        // Criar um array para armazenar as promessas de processamento
+                        const processingPromises = files.map(file => {
+                            return new Promise((resolve) => {
+                                const img = new Image();
+                                const reader = new FileReader();
+                                
+                                reader.onload = function(e) {
+                                    img.src = e.target.result;
+                                    
+                                    img.onload = function() {
+                                        // Criar canvas para redimensionamento
+                                        const canvas = document.createElement('canvas');
+                                        const MAX_WIDTH = 800;
+                                        const MAX_HEIGHT = 800;
+                                        
+                                        let width = img.width;
+                                        let height = img.height;
+                                        
+                                        // Calcular proporções
+                                        if (width > height) {
+                                            if (width > MAX_WIDTH) {
+                                                height *= MAX_WIDTH / width;
+                                                width = MAX_WIDTH;
+                                            }
+                                        } else {
+                                            if (height > MAX_HEIGHT) {
+                                                width *= MAX_HEIGHT / height;
+                                                height = MAX_HEIGHT;
+                                            }
+                                        }
+                                        
+                                        canvas.width = width;
+                                        canvas.height = height;
+                                        
+                                        // Desenhar e comprimir
+                                        const ctx = canvas.getContext('2d');
+                                        ctx.drawImage(img, 0, 0, width, height);
+                                        
+                                        // Converter para JPEG com qualidade reduzida
+                                        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                                        
+                                        // Adicionar à lista de imagens
+                                        uploadedImages.push(compressedDataUrl);
+                                        
+                                        resolve(compressedDataUrl);
+                                    };
+                                };
+                                
+                                reader.readAsDataURL(file);
+                            });
+                        });
+                        
+                        // Esperar que todas as imagens sejam processadas
+                        Promise.all(processingPromises).then(processedImages => {
+                            // Adicionar cada imagem ao carousel
+                            processedImages.forEach((dataUrl, index) => {
+                                const isActive = index === 0 ? 'active' : '';
+                                const carouselItem = document.createElement('div');
+                                carouselItem.className = `carousel-item ${isActive}`;
+                                carouselItem.innerHTML = `
+                                    <div class="d-flex justify-content-center">
+                                        <img src="${dataUrl}" class="img-fluid" style="max-height: 300px;">
+                                    </div>
+                                `;
+                                carouselInner.appendChild(carouselItem);
+                            });
                             
-                            let width = img.width;
-                            let height = img.height;
-                            
-                            // Calcular proporções
-                            if (width > height) {
-                                if (width > MAX_WIDTH) {
-                                    height *= MAX_WIDTH / width;
-                                    width = MAX_WIDTH;
-                                }
-                            } else {
-                                if (height > MAX_HEIGHT) {
-                                    width *= MAX_HEIGHT / height;
-                                    height = MAX_HEIGHT;
+                            // Adicionar controles se houver mais de uma imagem
+                            const carousel = document.getElementById('imagesCarousel');
+                            if (processedImages.length > 1) {
+                                // Adicionar controles do carousel
+                                if (!document.querySelector('.carousel-control-prev')) {
+                                    carousel.innerHTML += `
+                                        <button class="carousel-control-prev" type="button" data-bs-target="#imagesCarousel" data-bs-slide="prev">
+                                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                            <span class="visually-hidden">Anterior</span>
+                                        </button>
+                                        <button class="carousel-control-next" type="button" data-bs-target="#imagesCarousel" data-bs-slide="next">
+                                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                            <span class="visually-hidden">Próximo</span>
+                                        </button>
+                                    `;
                                 }
                             }
                             
-                            canvas.width = width;
-                            canvas.height = height;
+                            // Atualizar o contador de imagens
+                            const imageCounter = document.getElementById('imageCounter');
+                            if (imageCounter) {
+                                imageCounter.classList.remove('d-none');
+                                const badge = imageCounter.querySelector('.badge');
+                                if (badge) {
+                                    badge.textContent = `${processedImages.length} ${processedImages.length === 1 ? 'imagem selecionada' : 'imagens selecionadas'}`;
+                                }
+                            }
                             
-                            // Desenhar e comprimir
-                            const ctx = canvas.getContext('2d');
-                            ctx.drawImage(img, 0, 0, width, height);
-                            
-                            // Converter para JPEG com qualidade reduzida
-                            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                            
-                            // Atualizar preview e dados
-                            imagePreview.src = compressedDataUrl;
-                            imagePreview.style.display = 'block';
-                            photoData.value = compressedDataUrl;
+                            // Salvar todas as imagens como JSON no campo oculto
+                            photoData.value = JSON.stringify(uploadedImages);
                             
                             // Atualizar estado de validação da foto
-                            // Agora será tratado pelo setupFormValidation
                             if (typeof setupFormValidation != 'undefined' && 
                                 typeof setupFormValidation.updatePhotoValidation === 'function') {
                                 setupFormValidation.updatePhotoValidation(true);
                             } else {
                                 console.warn("setupFormValidation não disponível, usando método legado");
-                                finalizeButton.disabled = false;
+                                if (finalizeButton) finalizeButton.disabled = false;
+                                
+                                // Habilitar também o botão de retirada se estamos no modo de retirada
+                                const finalizeRemovalButton = document.getElementById('finalizeRemovalButton');
+                                if (finalizeRemovalButton && setupType && setupType.value === 'removal') {
+                                    finalizeRemovalButton.disabled = false;
+                                }
                             }
-                        }
-                        
-                        reader.readAsDataURL(file);
+                        });
                     }
                 });
             }
