@@ -71,13 +71,13 @@
                     {% if session.get('logged_in') and user_profile == 'auditor' %}
                         <div class="d-flex flex-wrap justify-content-center mb-3">
                             <a href="{{ url_for('register_qrcode') }}" class="btn btn-sm btn-outline-secondary me-2 mb-2">
-                                <i class="fa fa-qrcode me-1"></i> Cadastrar Novo QR Code
+                                <i class="fa fa-qrcode me-1"></i> QR Codes
                             </a>
                             <a href="{{ url_for('product_management') }}" class="btn btn-sm btn-outline-success me-2 mb-2">
-                                <i class="fa fa-cubes me-1"></i> Gerenciar Produtos
+                                <i class="fa fa-cubes me-1"></i> Produtos
                             </a>
                             <a href="{{ url_for('cadastro_usuarios') }}" class="btn btn-sm btn-outline-primary me-2 mb-2">
-                                <i class="fa fa-users me-1"></i> Gerenciar Usuários
+                                <i class="fa fa-users me-1"></i> Usuários
                             </a>
                         </div>
                     {% endif %}
