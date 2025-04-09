@@ -821,7 +821,7 @@ def get_all_setups():
             
             # Iterate through text files in each cell directory
             for file in os.listdir(cell_dir):
-                if file.endswith(".txt"):
+                if file.endswith(".txt") and not file.startswith('reset_'):
                     # O nome do arquivo agora inclui o tipo de setup (order_number_setup_type.txt)
                     file_basename = file.split(".")[0]
                     
@@ -843,6 +843,12 @@ def get_all_setups():
                         # Adicionar tipo de setup se não existir no dado carregado
                         if "setup_type" not in setup_data:
                             setup_data["setup_type"] = setup_type
+                            
+                        # Garantir que o campo audited é um booleano
+                        if "audited" in setup_data:
+                            if isinstance(setup_data["audited"], str):
+                                setup_data["audited"] = setup_data["audited"].lower() in ['true', 'yes', '1', 'on']
+                            setup_data["audited"] = bool(setup_data["audited"])
                         
                         # Garantir que file_identifier está disponível para referência posterior
                         setup_data["file_identifier"] = file_basename
@@ -1757,17 +1763,44 @@ def api_mark_as_audited():
     if user_profile != 'auditor':
         return jsonify({"success": False, "message": "Somente auditores podem alterar o status de auditoria"}), 403
     
+    # Buscar os dados existentes antes de qualquer atualização
+    cell_name = data.get('cell_name')
+    order_number = data.get('order_number')
+    setup_type = data.get('setup_type')
+    
+    # Diretório da célula e padrão de arquivo
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    prefix = f"{order_number}_{setup_type}"
+    
+    # Encontrar o arquivo correspondente
+    text_file_path = None
+    existing_data = {}
+    for file in os.listdir(cell_dir):
+        if file.endswith(".txt") and file.startswith(prefix):
+            text_file_path = os.path.join(cell_dir, file)
+            try:
+                with open(text_file_path, 'r') as f:
+                    existing_data = json.load(f)
+                break
+            except Exception as e:
+                logging.error(f"Erro ao ler arquivo existente: {e}")
+    
+    # Se não encontrou ou não conseguiu ler os dados existentes, usar valores padrão
+    supplier_name = existing_data.get('supplier_name', data.get('supplier_name', ''))
+    observation = existing_data.get('observation', data.get('observation', ''))
+    verification_check = existing_data.get('verification_check', False)
+    
     # Se for para desmarcar, definimos como False e limpamos o nome do auditor
     if not is_mark_action:
         success = update_setup(
-            data.get('cell_name'),
-            data.get('order_number'),
-            data.get('supplier_name', ''),
-            data.get('observation', ''),
-            data.get('verification_check') in [True, 'true', 'True', 'on', '1'],
+            cell_name,
+            order_number,
+            supplier_name,  # Manter o nome do abastecedor original
+            observation,    # Manter a observação original
+            verification_check,  # Manter o status de verificação original
             False,  # Desmarcar a auditoria
             '',     # Limpar o nome do auditor
-            data.get('setup_type'),
+            setup_type,
             None,   # Sem mudança na foto
             None,   # Sem mudança no timestamp
             ''      # Limpar anotações de auditoria
@@ -1777,14 +1810,14 @@ def api_mark_as_audited():
     # Caso contrário, marcamos como auditado normalmente
     else:
         success = update_setup(
-            data.get('cell_name'),
-            data.get('order_number'),
-            data.get('supplier_name', ''),
-            data.get('observation', ''),
-            data.get('verification_check') in [True, 'true', 'True', 'on', '1'],
+            cell_name,
+            order_number,
+            supplier_name,  # Manter o nome do abastecedor original
+            observation,    # Manter a observação original
+            verification_check,  # Manter o status de verificação original
             True,  # Marcar como auditado
             auditor_name,
-            data.get('setup_type'),
+            setup_type,
             None,  # Sem mudança na foto
             None,  # Sem mudança no timestamp
             audit_notes  # Incluir anotações de auditoria
