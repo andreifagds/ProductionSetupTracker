@@ -1,0 +1,1 @@
+{"order_number": "112233", "supplier_name": "Bsbs", "timestamp": "2025-04-09_06-13-28", "observation": "Sju", "verification_check": true, "setup_type": "supply", "audited": false, "images": [{"filename": "image_1.jpg", "path": "112233_supply_2025-04-09_06-13-28/image_1.jpg"}], "has_image": true, "main_image": "112233_supply_2025-04-09_06-13-28/image_1.jpg"}
