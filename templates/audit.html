@@ -1045,6 +1045,7 @@
                     }
 
                     const auditNotes = document.getElementById('auditNotes').value;
+                    const auditorName = '{{ session.get("username", "") }}';
                     
                     // Preparar dados para a API com as anotações
                     const data = {
