@@ -17,8 +17,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const productName = document.getElementById('productName');
     const selectedItems = document.getElementById('selectedItems');
     
-    // Estado de validação
-    let formValidationState = {
+    // Estado de validação - expor globalmente para poder ser acessado de outros scripts
+    window.formValidationState = {
         orderNumber: false,
         supplierName: false,
         photo: false,
@@ -36,7 +36,8 @@ document.addEventListener('DOMContentLoaded', function() {
     submitButton.disabled = true;
     
     // Função para verificar se todos os campos obrigatórios estão preenchidos
-    function validateForm() {
+    // Expor essa função globalmente para que possa ser chamada de outros scripts
+    window.validateForm = function() {
         console.log("[SETUP-VALIDATION] Validando formulário...");
         
         // Verificar o tipo de setup (supply ou removal)

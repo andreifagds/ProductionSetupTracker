@@ -539,7 +539,11 @@
             const photoInput = document.getElementById('photoInput');
             const imagePreview = document.getElementById('imagePreview');
             const photoData = document.getElementById('photoData');
-            const finalizeButton = document.getElementById('submitSetupBtn');
+            const submitButton = document.getElementById('submitSetupBtn');
+            
+            // Importar função e estado da validação
+            const validateForm = window.validateForm;
+            const formValidationState = window.formValidationState;
             const setupTypeSelectionContainer = document.getElementById('setupTypeSelectionContainer');
             const setupFormContainer = document.getElementById('setupFormContainer');
             const setupTypeRemovalBtn = document.getElementById('setupTypeRemoval');
@@ -706,8 +710,9 @@
                             imagePreview.style.display = 'block';
                             photoData.value = compressedDataUrl;
                             
-                            // Enable finalize button
-                            finalizeButton.disabled = false;
+                            // Usar a validação global em vez de habilitar o botão diretamente
+                            formValidationState.photo = true;
+                            validateForm();
                         }
                         
                         reader.readAsDataURL(file);
