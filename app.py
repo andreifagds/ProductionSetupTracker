@@ -894,6 +894,9 @@ def get_all_setups():
 
 def update_setup(cell_name, order_number, supplier_name, observation, verification_check, audited=None, auditor_name=None, setup_type=None, photo_data=None, timestamp=None, audit_notes=None):
     """Update an existing setup data file."""
+    # Adicionar log detalhado dos dados recebidos
+    logging.debug(f"Atualizando setup: cell_name={cell_name}, order_number={order_number}, supplier_name={supplier_name}, observation={observation}, verification_check={verification_check}, setup_type={setup_type}")
+    
     # Normalizar o valor de verification_check para booleano
     if isinstance(verification_check, str):
         verification_check = verification_check.lower() in ['true', 'on', '1', 'yes']
@@ -947,10 +950,16 @@ def update_setup(cell_name, order_number, supplier_name, observation, verificati
         with open(text_file_path, 'r') as f:
             data = json.load(f)
         
+        # Log dos dados atuais antes da atualização
+        logging.debug(f"Dados antes da atualização: supplier_name={data.get('supplier_name', '')}, observation={data.get('observation', '')}")
+        
         # Update fields
         data["supplier_name"] = supplier_name if supplier_name is not None else data.get("supplier_name", "")
         data["observation"] = observation
         data["verification_check"] = verification_check
+        
+        # Log depois da atualização
+        logging.debug(f"Dados após atualização: supplier_name={data.get('supplier_name', '')}, observation={data.get('observation', '')}")
         
         # Atualizar o timestamp se fornecido
         if timestamp:
@@ -1027,8 +1036,20 @@ def update_setup(cell_name, order_number, supplier_name, observation, verificati
                     logging.error(f"Error saving photo: {e}")
                     # Não falhar completamente só por causa da foto
         
+        # Registrar conteúdo antes de salvar
+        logging.debug(f"Dados finais antes de salvar: observation={data.get('observation', '(vazio)')}")
+        
+        # Salvar arquivo
         with open(text_file_path, 'w') as f:
             json.dump(data, f)
+            
+        # Verificar se o arquivo foi salvo corretamente
+        try:
+            with open(text_file_path, 'r') as f:
+                saved_data = json.load(f)
+                logging.debug(f"Verificação após salvar: observation={saved_data.get('observation', '(não encontrado)')}")
+        except Exception as e:
+            logging.error(f"Erro ao verificar arquivo salvo: {e}")
             
         return True
     except (FileNotFoundError, json.JSONDecodeError) as e:
@@ -1672,11 +1693,17 @@ def api_update_setup():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
     
     data = request.json
+    logging.debug(f"API update_setup: dados recebidos = {json.dumps(data)}")
+    
+    # Verificar explicitamente o campo observation
+    observation = data.get('observation', '')
+    logging.debug(f"API update_setup: observation recebido = '{observation}'")
+    
     success = update_setup(
         data.get('cell_name'),
         data.get('order_number'),
         data.get('supplier_name'),
-        data.get('observation', ''),
+        observation,
         data.get('verification_check', False),
         data.get('audited'),
         data.get('auditor_name'),

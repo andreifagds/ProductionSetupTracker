@@ -890,6 +890,15 @@
                 const photoData = document.getElementById('editPhotoData').value;
                 const timestamp = document.getElementById('editTimestamp').value;
                 
+                // DEBUG: Log dos dados antes de atualizar
+                console.log("Salvando com dados:", {
+                    cellName, orderNumber, supplierName, 
+                    observation: `"${observation}"`, // Exibe as aspas para verificar espaços
+                    verificationCheck, setupType, 
+                    photoData: photoData ? "[DADOS DE FOTO]" : "null", 
+                    timestamp
+                });
+                
                 // Formatar timestamp para o formato que o servidor espera (se existir)
                 let formattedTimestamp = null;
                 if (timestamp) {
@@ -946,6 +955,9 @@
         
         // Função para atualizar setup
         function updateSetup(cellName, orderNumber, supplierName, observation, verificationCheck, audited, auditor_name, setupType, photoData, timestamp) {
+            // Debug info
+            console.log(`updateSetup: observation=${observation}`);
+            
             // Preparar dados para a API
             const data = {
                 cell_name: cellName,
