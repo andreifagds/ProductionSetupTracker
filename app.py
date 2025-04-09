@@ -712,10 +712,23 @@ def save_setup(cell_name, order_number, supplier_name, photo_data, observation, 
             data["product_po"] = product_po
         
         # Adicionar itens selecionados se houver
-        if selected_items and isinstance(selected_items, list):
-            data["selected_items"] = selected_items
+        # Verificação e conversão para garantir que selected_items é uma lista válida
+        if selected_items:
+            if isinstance(selected_items, str):
+                try:
+                    # Tenta converter de string JSON para lista
+                    data["selected_items"] = json.loads(selected_items)
+                except json.JSONDecodeError:
+                    data["selected_items"] = []
+            elif isinstance(selected_items, list):
+                data["selected_items"] = selected_items
+            else:
+                data["selected_items"] = []
         else:
             data["selected_items"] = []
+            
+        # Adicionar log para debug do array de itens
+        logging.debug(f"Itens selecionados para salvar: {data.get('selected_items', [])}")
     
     # Caminho completo do arquivo de texto
     txt_path = os.path.join(cell_dir, f"{file_identifier}.txt")
@@ -974,8 +987,8 @@ def update_setup(cell_name, order_number, supplier_name, observation, verificati
         # Update audit fields if provided
         if audited is not None:
             data["audited"] = audited
-            # Se estiver marcando como auditado, definir timestamp da auditoria
-            if audited and not data.get("audit_timestamp"):
+            # Se estiver marcando como auditado, sempre definir timestamp da auditoria atual
+            if audited:
                 data["audit_timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             # Se estiver desmarcando, remover o timestamp da auditoria
             elif not audited and data.get("audit_timestamp"):

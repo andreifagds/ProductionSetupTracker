@@ -310,6 +310,7 @@
                                                     data-audited="{{ setup.audited|default(false)|string|lower }}"
                                                     data-auditor-name="{{ setup.auditor_name|default('') }}"
                                                     data-audit-notes="{{ setup.audit_notes|default('') }}"
+                                                    data-audit-timestamp="{{ setup.audit_timestamp|default('') }}"
                                                     data-verification-check="{{ setup.verification_check|default(false)|string|lower }}"
                                                     {% if setup.setup_type == 'supply' %}
                                                     data-product-code="{{ setup.product_code|default('') }}"
@@ -627,6 +628,7 @@
                 audited: setupCard.getAttribute('data-audited') === 'true',
                 auditorName: setupCard.getAttribute('data-auditor-name'),
                 auditNotes: setupCard.getAttribute('data-audit-notes'),
+                audit_timestamp: setupCard.getAttribute('data-audit-timestamp'),
                 verificationCheck: setupCard.getAttribute('data-verification-check') === 'true'
             };
             
