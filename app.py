@@ -1876,7 +1876,7 @@ def get_photo(cell_name, filepath):
         # Compatibilidade com formato antigo
         return send_from_directory(cell_dir, filepath)
 
-@app.route('/photos/<cell_name>/<order_number>_<setup_type>')
+@app.route('/get_setup_images/<cell_name>/<order_number>/<setup_type>')
 def get_setup_images(cell_name, order_number, setup_type):
     """API para obter as imagens de um setup específico.
     
@@ -1899,13 +1899,12 @@ def get_setup_images(cell_name, order_number, setup_type):
         images = []
         for filename in os.listdir(setup_dir):
             if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
-                images.append({
-                    "filename": filename,
-                    "path": os.path.join(setup_identifier, filename)
-                })
+                # Criar URL completa para a imagem
+                image_url = url_for('get_photo', cell_name=cell_name, filepath=f"{setup_identifier}/{filename}")
+                images.append(image_url)
                 
         # Ordenar imagens pelo nome (normalmente image_1.jpg, image_2.jpg, etc)
-        images.sort(key=lambda x: x["filename"])
+        images.sort()
         
         return jsonify({
             "success": True,
@@ -1915,12 +1914,11 @@ def get_setup_images(cell_name, order_number, setup_type):
         # Se não encontrar um diretório, verificar se existe a imagem no formato antigo
         old_format_path = os.path.join(cell_dir, f"{setup_identifier}.jpg")
         if os.path.isfile(old_format_path):
+            # Criar URL completa para a imagem
+            image_url = url_for('get_photo', cell_name=cell_name, filepath=f"{setup_identifier}.jpg")
             return jsonify({
                 "success": True,
-                "images": [{
-                    "filename": f"{setup_identifier}.jpg",
-                    "path": f"{setup_identifier}.jpg"
-                }]
+                "images": [image_url]
             })
         
         # Se não encontrar nenhuma imagem
