@@ -123,18 +123,23 @@ document.addEventListener('DOMContentLoaded', function() {
                 return false;
             }
             
-            // Verificar tipo de setup e suas validações específicas
+            // Verificar o tipo de setup atual
             const setupType = document.getElementById('setupType');
+            console.log("Tipo de setup para validação final:", setupType ? setupType.value : "não definido");
+            
+            // Se for abastecimento, precisamos validar produtos
             if (setupType && setupType.value === 'supply') {
                 // Para abastecimento, verificar se temos produtos selecionados
-                const productCodeInput = document.getElementById('product_code');
-                if (productCodeInput && productCodeInput.required && (!productCodeInput.value || productCodeInput.value.trim() === '')) {
+                const productCodeInput = document.getElementById('productCode');
+                if (productCodeInput && (!productCodeInput.value || productCodeInput.value.trim() === '')) {
                     console.log("Produto não selecionado para abastecimento");
                     event.preventDefault();
                     event.stopPropagation();
                     alert("Para abastecimento, você deve selecionar um produto.");
                     return false;
                 }
+            } else {
+                console.log("Modo retirada - ignorando validação de produto");
             }
             
             // Desabilitar o botão para evitar envios múltiplos
@@ -298,6 +303,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (verificationCheckbox && finalizeButton) {
             function updateButtonState() {
                 console.log("[SETUP-BUTTON] Atualizando estado do botão");
+                
+                // Obter o tipo de setup atual
+                const setupTypeElement = document.getElementById('setupType');
+                const currentSetupType = setupTypeElement ? setupTypeElement.value : 'supply';
+                console.log("[SETUP-BUTTON] Tipo de setup atual:", currentSetupType);
+                
+                // Verificar o campo de ordem de produção
                 const orderNumberValid = document.getElementById('orderNumber').value.trim() !== '';
                 console.log("[SETUP-BUTTON] orderNumberValid:", orderNumberValid);
                 
@@ -320,11 +332,35 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Verificar se temos pelo menos uma imagem
                 const photoValid = photoDataInput.value !== '';
                 console.log("[SETUP-BUTTON] photoValid:", photoValid);
+                
+                // Verificar a checkbox de verificação
                 const checkboxValid = verificationCheckbox.checked;
                 console.log("[SETUP-BUTTON] checkboxValid:", checkboxValid);
                 
-                console.log("[SETUP-BUTTON] Habilitando botão:", orderNumberValid && supplierNameValid && photoValid && checkboxValid);
-                finalizeButton.disabled = !(orderNumberValid && supplierNameValid && photoValid && checkboxValid);
+                // Verificar produtos para o modo de abastecimento
+                let productValid = true;
+                if (currentSetupType === 'supply') {
+                    const productCodeElement = document.getElementById('productCode');
+                    const productNameElement = document.getElementById('productName');
+                    
+                    if (productCodeElement && productNameElement) {
+                        productValid = !!productCodeElement.value && !!productNameElement.value;
+                        console.log("[SETUP-BUTTON] Modo abastecimento - productValid:", productValid);
+                    }
+                } else {
+                    console.log("[SETUP-BUTTON] Modo retirada - ignorando validação de produto");
+                }
+                
+                // Verificar todos os campos obrigatórios para o tipo atual
+                let isValid = orderNumberValid && supplierNameValid && photoValid && checkboxValid;
+                
+                // Para abastecimento, também validar produto
+                if (currentSetupType === 'supply') {
+                    isValid = isValid && productValid;
+                }
+                
+                console.log("[SETUP-BUTTON] Habilitando botão:", isValid);
+                finalizeButton.disabled = !isValid;
             }
             
             verificationCheckbox.addEventListener('change', updateButtonState);

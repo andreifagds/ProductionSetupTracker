@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', function() {
             formValidationState.supplierName = !!supplierName.value.trim();
         } else {
             // Caso padrão
-            formValidationState.supplierName = !!supplierName.value.trim();
+            formValidationState.supplierName = true; // Alterado para true por padrão para evitar validação desnecessária
         }
         
         // Verificar se há fotos válidas
@@ -70,63 +70,76 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Para abastecimento (supply), também validar produto e itens
         if (isSupplyType) {
-            // Produto é obrigatório
-            formValidationState.product = !!productCode.value && !!productName.value;
-            
-            // Adicionar feedback visual para o campo de produto
-            const productSelectionElement = document.getElementById('productSelection');
-            const productCodeElement = document.getElementById('productCode');
-            
-            if (formValidationState.product) {
-                // Produtos válidos
-                if (productSelectionElement) {
-                    productSelectionElement.classList.remove('is-invalid');
-                    productSelectionElement.classList.add('is-valid');
-                }
-                if (productCodeElement) {
-                    productCodeElement.classList.remove('is-invalid');
-                    productCodeElement.classList.add('is-valid');
+            // Verificar se os elementos existem antes de validá-los
+            if (productCode && productName) {
+                // Produto é obrigatório
+                formValidationState.product = !!productCode.value && !!productName.value;
+                
+                // Adicionar feedback visual para o campo de produto
+                const productSelectionElement = document.getElementById('productSelection');
+                const productCodeElement = document.getElementById('productCode');
+                
+                if (formValidationState.product) {
+                    // Produtos válidos
+                    if (productSelectionElement) {
+                        productSelectionElement.classList.remove('is-invalid');
+                        productSelectionElement.classList.add('is-valid');
+                    }
+                    if (productCodeElement) {
+                        productCodeElement.classList.remove('is-invalid');
+                        productCodeElement.classList.add('is-valid');
+                    }
+                    
+                    // Atualizar mensagem de ajuda
+                    const productHelp = document.getElementById('productHelp');
+                    if (productHelp) {
+                        productHelp.classList.remove('text-danger');
+                        productHelp.textContent = 'Produto selecionado corretamente.';
+                    }
+                } else {
+                    // Produtos inválidos
+                    if (productSelectionElement) {
+                        productSelectionElement.classList.add('is-invalid');
+                        productSelectionElement.classList.remove('is-valid');
+                    }
+                    if (productCodeElement) {
+                        productCodeElement.classList.add('is-invalid');
+                        productCodeElement.classList.remove('is-valid');
+                    }
+                    
+                    // Atualizar mensagem de ajuda
+                    const productHelp = document.getElementById('productHelp');
+                    if (productHelp) {
+                        productHelp.classList.add('text-danger');
+                        productHelp.textContent = 'É obrigatório selecionar um produto para o abastecimento.';
+                    }
                 }
                 
-                // Atualizar mensagem de ajuda
-                const productHelp = document.getElementById('productHelp');
-                if (productHelp) {
-                    productHelp.classList.remove('text-danger');
-                    productHelp.textContent = 'Produto selecionado corretamente.';
+                // Validar se os itens do produto estão completos
+                if (typeof validateSelectedItems === 'function') {
+                    validateSelectedItems();
+                } else {
+                    // Se a função não estiver disponível, assumir que os itens são válidos
+                    formValidationState.items = true;
                 }
             } else {
-                // Produtos inválidos
-                if (productSelectionElement) {
-                    productSelectionElement.classList.add('is-invalid');
-                    productSelectionElement.classList.remove('is-valid');
-                }
-                if (productCodeElement) {
-                    productCodeElement.classList.add('is-invalid');
-                    productCodeElement.classList.remove('is-valid');
-                }
-                
-                // Atualizar mensagem de ajuda
-                const productHelp = document.getElementById('productHelp');
-                if (productHelp) {
-                    productHelp.classList.add('text-danger');
-                    productHelp.textContent = 'É obrigatório selecionar um produto para o abastecimento.';
-                }
+                console.log("[SETUP-VALIDATION] Elementos de produto não encontrados, mas são necessários para supply");
+                // Se os elementos não existem, mas deveriam existir para supply, marcar como inválido
+                formValidationState.product = false;
             }
-            
-            // Validar se os itens do produto estão completos
-            validateSelectedItems();
         } else {
             // Para retirada (removal), esses campos não são obrigatórios
+            console.log("[SETUP-VALIDATION] Modo retirada - produtos e itens não são obrigatórios");
             formValidationState.product = true;
             formValidationState.items = true;
             
-            // Remover feedback visual para campos que não são necessários
+            // Remover feedback visual para campos que não são necessários (se existirem)
             const productSelectionElement = document.getElementById('productSelection');
             const productCodeElement = document.getElementById('productCode');
             if (productSelectionElement) productSelectionElement.classList.remove('is-invalid', 'is-valid');
             if (productCodeElement) productCodeElement.classList.remove('is-invalid', 'is-valid');
             
-            // Restaurar mensagem de ajuda
+            // Restaurar mensagem de ajuda (se existir)
             const productHelp = document.getElementById('productHelp');
             if (productHelp) {
                 productHelp.classList.remove('text-danger');
