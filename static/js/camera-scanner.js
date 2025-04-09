@@ -518,12 +518,41 @@ function setupFormForType(setupType) {
         if (verificationLabel) {
             verificationLabel.textContent = 'Confirmo que realizei a retirada completa dos materiais do produto anterior';
         }
+        
+        // Remover validação de campos de produto para retirada
+        const productCodeInput = document.getElementById('productCode');
+        const productSelectionInput = document.getElementById('productSelection');
+        
+        if (productCodeInput) {
+            productCodeInput.removeAttribute('required');
+            console.log("[SETUP-FORM] Removendo atributo required do produtCode para modo retirada");
+        }
+        
+        if (productSelectionInput) {
+            productSelectionInput.removeAttribute('required');
+            console.log("[SETUP-FORM] Removendo atributo required do productSelection para modo retirada");
+        }
+        
     } else {
         // Configurar para abastecimento
         if (setupTypeTitle) setupTypeTitle.textContent = 'Abastecimento de Material';
         if (operatorLabel) operatorLabel.textContent = 'Abastecedor';
         if (verificationLabel) {
             verificationLabel.textContent = 'Confirmo que realizei o abastecimento correto de todos os materiais para o novo produto';
+        }
+        
+        // Adicionar validação para campos de produto em abastecimento
+        const productCodeInput = document.getElementById('productCode');
+        const productSelectionInput = document.getElementById('productSelection');
+        
+        if (productCodeInput) {
+            productCodeInput.setAttribute('required', 'required');
+            console.log("[SETUP-FORM] Adicionando atributo required ao produtCode para modo abastecimento");
+        }
+        
+        if (productSelectionInput) {
+            productSelectionInput.setAttribute('required', 'required');
+            console.log("[SETUP-FORM] Adicionando atributo required ao productSelection para modo abastecimento");
         }
     }
 

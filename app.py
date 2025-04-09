@@ -1250,17 +1250,24 @@ def setup():
         # Obter QR code da célula atual
         cell_qrcode = request.form.get('qrcode_value')
         
+        # Validação básica para todos os tipos
+        if not all(required_fields):
+            flash('Todos os campos obrigatórios devem ser preenchidos', 'danger')
+            return redirect(url_for('setup', qrcode=cell_qrcode))
+        
         # Validação específica para abastecimento
         if setup_type == 'supply':
             # Produto é obrigatório para operações de abastecimento
             if not product_code or not product_name:
                 flash('Para registros de abastecimento, é obrigatório selecionar um produto.', 'danger')
                 return redirect(url_for('setup', qrcode=cell_qrcode))
-        
-        # Validar campos básicos
-        if not all(required_fields):
-            flash('Todos os campos obrigatórios devem ser preenchidos', 'danger')
-            return redirect(url_for('setup', qrcode=cell_qrcode))
+        elif setup_type == 'removal':
+            # Para retirada, produto e itens não são obrigatórios
+            # Garantir que esses campos não causem problemas quando não preenchidos
+            product_code = None
+            product_name = None
+            product_po = None
+            selected_items = []
         
         # Converter string JSON para lista de imagens, se for JSON
         try:

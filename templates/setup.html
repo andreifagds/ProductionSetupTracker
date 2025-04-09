@@ -154,6 +154,46 @@
                                 <!-- Hidden setup type -->
                                 <input type="hidden" id="setupType" name="setup_type" value="supply">
                                 
+                                <!-- Script para manipular o envio do formulário -->
+                                <script>
+                                    document.addEventListener('DOMContentLoaded', function() {
+                                        // Substituir o evento submit padrão para tratar diferentemente cada tipo
+                                        const formElement = document.getElementById('setupForm');
+                                        const originalSubmit = formElement.submit;
+                                        
+                                        formElement.addEventListener('submit', function(e) {
+                                            // Verificar o tipo de setup
+                                            const setupType = document.getElementById('setupType').value;
+                                            console.log('[FORM-SUBMIT] Tipo de setup:', setupType);
+                                            
+                                            // Se for retirada, remover required de campos de produto antes de enviar
+                                            if (setupType === 'removal') {
+                                                console.log('[FORM-SUBMIT] Modo retirada - removendo validação de produto');
+                                                const productInputs = formElement.querySelectorAll('.supply-fields input, .supply-fields select');
+                                                productInputs.forEach(input => {
+                                                    input.removeAttribute('required');
+                                                });
+                                            }
+                                            
+                                            // Verificar se os outros campos obrigatórios comuns a ambos os tipos estão preenchidos
+                                            const orderNumber = document.getElementById('orderNumber').value.trim();
+                                            const photoData = document.getElementById('photoData').value;
+                                            const verificationCheck = document.getElementById('verificationCheck').checked;
+                                            
+                                            if (!orderNumber || !photoData || !verificationCheck) {
+                                                console.log('[FORM-SUBMIT] Campos obrigatórios não preenchidos');
+                                                console.log('[FORM-SUBMIT] orderNumber:', orderNumber);
+                                                console.log('[FORM-SUBMIT] photoData:', !!photoData);
+                                                console.log('[FORM-SUBMIT] verificationCheck:', verificationCheck);
+                                                return; // Deixar a validação normal do formulário mostrar os erros
+                                            }
+                                            
+                                            // Se chegou até aqui, o formulário é válido para o tipo atual
+                                            console.log('[FORM-SUBMIT] Formulário válido, continuando envio');
+                                        });
+                                    });
+                                </script>
+                                
                                 <!-- Order Number -->
                                 <div class="mb-3">
                                     <label for="orderNumber" class="form-label">Número da Ordem de Produção</label>
@@ -221,7 +261,7 @@
     <label for="productSelection" class="form-label">Produto <span class="text-danger">*</span></label>
     <div class="row">
         <div class="col-md-4 mb-2 mb-md-0">
-            <input type="text" class="form-control" id="productCode" name="product_code" placeholder="Código" required>
+            <input type="text" class="form-control" id="productCode" name="product_code" placeholder="Código">
             <input type="hidden" id="productName" name="product_name">
             <input type="hidden" id="selectedItems" name="selected_items">
             <div class="invalid-feedback">
@@ -229,7 +269,7 @@
             </div>
         </div>
         <div class="col-md-8">
-            <select class="form-select" id="productSelection" required>
+            <select class="form-select" id="productSelection">
                 <option value="" selected>Selecione um produto</option>
                 {% for product in cell_products %}
                 <option value="{{ product.code }}" data-name="{{ product.name }}">
