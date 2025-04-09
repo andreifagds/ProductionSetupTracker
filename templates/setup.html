@@ -261,8 +261,18 @@
                                     <textarea class="form-control" id="observation" name="observation" rows="3"></textarea>
                                 </div>
                                 
-                                <!-- Verification Checkbox (hidden, always set to true) -->
-                                <input type="hidden" value="on" id="verificationCheck" name="verification_check">
+                                <!-- Verification Checkbox -->
+                                <div class="mb-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="on" id="verificationCheck" name="verification_check" required>
+                                        <label class="form-check-label" for="verificationCheck" id="verificationLabel">
+                                            Confirmo que verifiquei todos os itens necessários
+                                        </label>
+                                        <div class="invalid-feedback">
+                                            Você deve confirmar a verificação antes de finalizar.
+                                        </div>
+                                    </div>
+                                </div>
                                 
                                 <!-- Submit Button -->
                                 <div class="text-center">

@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
         orderNumber: false,
         supplierName: false,
         photo: false,
-        verification: true, // Sempre true agora, pois o campo não é mais mostrado
+        verification: false,
         product: true,  // Por padrão verdadeiro, só é necessário para supply
         items: true     // Por padrão verdadeiro, só é necessário para supply
     };
@@ -154,8 +154,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // A verificação do setup agora é sempre considerada verdadeira
-    // O checkbox foi removido, então não precisamos mais do listener
+    // Verificação do setup
+    if (verificationCheck) {
+        verificationCheck.addEventListener('change', function() {
+            formValidationState.verification = this.checked;
+            validateForm();
+        });
+    }
     
     // Seleção de produto (apenas para abastecimento)
     if (productSelection) {

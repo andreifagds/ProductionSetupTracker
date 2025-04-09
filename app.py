@@ -892,7 +892,7 @@ def get_all_setups():
     
     return cells
 
-def update_setup(cell_name, order_number, supplier_name, observation, verification_check, audited=None, auditor_name=None, setup_type=None, photo_data=None, timestamp=None, audit_notes=None, product_code=None, product_name=None, product_po=None, selected_items=None):
+def update_setup(cell_name, order_number, supplier_name, observation, verification_check, audited=None, auditor_name=None, setup_type=None, photo_data=None, timestamp=None, audit_notes=None):
     """Update an existing setup data file."""
     # Normalizar o valor de verification_check para booleano
     if isinstance(verification_check, str):
@@ -976,17 +976,6 @@ def update_setup(cell_name, order_number, supplier_name, observation, verificati
         # Garantir que o setup_type está definido
         if setup_type and "setup_type" not in data:
             data["setup_type"] = setup_type
-            
-        # Atualizar dados de produto e itens se fornecidos e se for tipo 'supply'
-        if data.get("setup_type") == "supply":
-            if product_code is not None:
-                data["product_code"] = product_code
-            if product_name is not None:
-                data["product_name"] = product_name
-            if product_po is not None:
-                data["product_po"] = product_po
-            if selected_items is not None:
-                data["selected_items"] = selected_items
         
         # Atualizar a foto se fornecida
         if photo_data:
@@ -1001,79 +990,42 @@ def update_setup(cell_name, order_number, supplier_name, observation, verificati
             else:
                 photo_data_list = []
             
-            # Processar as imagens (múltiplas ou única)
+            # Processar apenas a primeira imagem no formato antigo
             if photo_data_list:
-                # Marcar que tem imagem
-                data["has_image"] = True
-                
-                # Se houver mais de uma imagem, criar diretório para armazená-las
-                if len(photo_data_list) > 1:
-                    # Criar diretório para as imagens, se não existir
-                    images_dir = os.path.join(cell_dir, file_identifier)
-                    ensure_dir(images_dir)
+                photo_item = photo_data_list[0]
+                # Remove the "data:image/jpeg;base64," part
+                if "base64," in photo_item:
+                    photo_item = photo_item.split("base64,")[1]
                     
-                    # Processar e salvar cada imagem no diretório
-                    for i, photo_item in enumerate(photo_data_list):
-                        # Remove the "data:image/jpeg;base64," part
-                        if "base64," in photo_item:
-                            photo_item = photo_item.split("base64,")[1]
-                        
-                        try:
-                            # Decode photo data
-                            photo_bytes = base64.b64decode(photo_item)
-                            photo_path = os.path.join(images_dir, f"image_{i+1}.jpg")
-                            
-                            # Processar imagem para reduzir tamanho
-                            from PIL import Image
-                            from io import BytesIO
-                            
-                            # Abrir a imagem a partir dos bytes
-                            img = Image.open(BytesIO(photo_bytes))
-                            
-                            # Converter para RGB se estiver em modo P (palette) ou outros modos
-                            if img.mode != 'RGB':
-                                img = img.convert('RGB')
-                            
-                            # Redimensionar se a imagem for muito grande
-                            max_size = (1200, 1200)
-                            img.thumbnail(max_size, Image.LANCZOS)
-                            
-                            # Salvar com qualidade reduzida
-                            img.save(photo_path, format='JPEG', optimize=True, quality=85)
-                        except Exception as e:
-                            logging.error(f"Error saving photo {i+1}: {e}")
-                else:
-                    # Processar apenas uma imagem no formato antigo
-                    photo_item = photo_data_list[0]
-                    # Remove the "data:image/jpeg;base64," part
-                    if "base64," in photo_item:
-                        photo_item = photo_item.split("base64,")[1]
-                        
-                    try:
-                        # Decode photo data
-                        photo_bytes = base64.b64decode(photo_item)
-                        photo_path = os.path.join(cell_dir, f"{file_identifier}.jpg")
-                        
-                        # Processar imagem para reduzir tamanho
-                        from PIL import Image
-                        from io import BytesIO
-                        
-                        # Abrir a imagem a partir dos bytes
-                        img = Image.open(BytesIO(photo_bytes))
-                        
-                        # Converter para RGB se estiver em modo P (palette) ou outros modos
-                        if img.mode != 'RGB':
-                            img = img.convert('RGB')
-                        
-                        # Redimensionar se a imagem for muito grande
-                        max_size = (1200, 1200)
-                        img.thumbnail(max_size, Image.LANCZOS)
-                        
-                        # Salvar com qualidade reduzida
-                        img.save(photo_path, format='JPEG', optimize=True, quality=85)
-                    except Exception as e:
-                        logging.error(f"Error saving photo: {e}")
-                        # Não falhar completamente só por causa da foto
+                try:
+                    # Decode photo data
+                    photo_bytes = base64.b64decode(photo_item)
+                    photo_path = os.path.join(cell_dir, f"{file_identifier}.jpg")
+                    
+                    # Processar imagem para reduzir tamanho
+                    from PIL import Image
+                    from io import BytesIO
+                    
+                    # Abrir a imagem a partir dos bytes
+                    img = Image.open(BytesIO(photo_bytes))
+                    
+                    # Converter para RGB se estiver em modo P (palette) ou outros modos
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # Redimensionar se a imagem for muito grande
+                    max_size = (1200, 1200)
+                    img.thumbnail(max_size, Image.LANCZOS)
+                    
+                    # Salvar com qualidade reduzida
+                    img.save(photo_path, format='JPEG', optimize=True, quality=85)
+                    
+                    # Marcar que tem imagem
+                    data["has_image"] = True
+                    
+                except Exception as e:
+                    logging.error(f"Error saving photo: {e}")
+                    # Não falhar completamente só por causa da foto
         
         with open(text_file_path, 'w') as f:
             json.dump(data, f)
@@ -1720,35 +1672,17 @@ def api_update_setup():
         return jsonify({"success": False, "message": "Unauthorized"}), 401
     
     data = request.json
-    
-    # Verificar se tem informações de produto para setup do tipo 'supply'
-    product_code = None
-    product_name = None
-    product_po = None
-    selected_items = None
-    
-    if data.get('setup_type') == 'supply':
-        product_code = data.get('product_code')
-        product_name = data.get('product_name')
-        product_po = data.get('product_po')
-        selected_items = data.get('selected_items')
-    
     success = update_setup(
         data.get('cell_name'),
         data.get('order_number'),
         data.get('supplier_name'),
         data.get('observation', ''),
-        data.get('verification_check', True),  # Default para true
+        data.get('verification_check', False),
         data.get('audited'),
         data.get('auditor_name'),
         data.get('setup_type'),
         data.get('photo_data'),
-        data.get('timestamp'),
-        None,  # audit_notes
-        product_code,
-        product_name,
-        product_po,
-        selected_items
+        data.get('timestamp')
     )
     
     if success:
@@ -1912,41 +1846,6 @@ def get_photo(cell_name, filepath):
     else:
         # Compatibilidade com formato antigo
         return send_from_directory(cell_dir, filepath)
-
-@app.route('/api/check_images/<cell_name>/<order_number>/<setup_type>')
-def check_setup_images(cell_name, order_number, setup_type):
-    """API para verificar imagens de um setup específico.
-    
-    Verifica se existem imagens para um setup, tanto no formato único quanto múltiplo.
-    
-    Args:
-        cell_name: Nome da célula
-        order_number: Número da ordem
-        setup_type: Tipo de setup (supply ou removal)
-    
-    Returns:
-        JSON com lista de caminhos de imagens encontradas
-    """
-    # Verificar se existe um diretório com múltiplas imagens
-    setup_dir_name = f"{order_number}_{setup_type}"
-    setup_dir_path = os.path.join(DATA_DIR, cell_name, setup_dir_name)
-    
-    images = []
-    
-    # Verificar se existe o diretório e listar imagens
-    if os.path.exists(setup_dir_path) and os.path.isdir(setup_dir_path):
-        for filename in os.listdir(setup_dir_path):
-            if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
-                image_path = f"/photos/{cell_name}/{setup_dir_name}/{filename}"
-                images.append(image_path)
-    else:
-        # Verificar se existe a imagem única
-        image_path = f"{setup_dir_name}.jpg"
-        full_path = os.path.join(DATA_DIR, cell_name, image_path)
-        if os.path.exists(full_path) and os.path.isfile(full_path):
-            images.append(f"/photos/{cell_name}/{image_path}")
-    
-    return jsonify({"success": True, "images": images})
 
 def reset_cell_flow(cell_name, reason):
     """Reset the flow of a cell without deleting records.

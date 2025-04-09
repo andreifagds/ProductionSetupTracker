@@ -251,7 +251,13 @@
                                                                             </strong> 
                                                                             {{ setup.supplier_name }}
                                                                         </p>
-
+                                                                        <p><strong>Verificação:</strong> 
+                                                                            {% if setup.verification_check %}
+                                                                                <span class="badge bg-success">Verificado</span>
+                                                                            {% else %}
+                                                                                <span class="badge bg-danger">Não Verificado</span>
+                                                                            {% endif %}
+                                                                        </p>
                                                                         {% if setup.audited %}
                                                                             <div class="audit-info">
                                                                                 <p><strong>Auditado por:</strong> {{ setup.auditor_name }}</p>
@@ -347,13 +353,7 @@
                                                                                 data-supplier-name="{{ setup.supplier_name }}"
                                                                                 data-observation="{{ setup.observation }}"
                                                                                 data-verification-check="{{ setup.verification_check }}"
-                                                                                data-setup-type="{{ setup.setup_type }}"
-                                                                                {% if setup.setup_type == 'supply' and setup.product_code %}
-                                                                                data-product-code="{{ setup.product_code }}"
-                                                                                data-product-name="{{ setup.product_name }}"
-                                                                                {% if setup.product_po %}data-product-po="{{ setup.product_po }}"{% endif %}
-                                                                                {% if setup.selected_items %}data-selected-items='{{ setup.selected_items|tojson }}'{% endif %}
-                                                                                {% endif %}
+                                                                                data-setup-type="{{ setup.setup_type }}">
                                                                             <i class="fa fa-edit me-1"></i> Editar
                                                                         </button>
                                                                         
@@ -415,7 +415,7 @@
 
     <!-- Edit Setup Modal -->
     <div class="modal fade" id="editSetupModal" tabindex="-1" aria-labelledby="editSetupModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="editSetupModalLabel">Editar Setup</h5>
@@ -440,104 +440,40 @@
                             <input type="text" class="form-control" id="editSupplierName" name="supplier_name" required>
                         </div>
                         
-                        <!-- Campos de Produto e Items (apenas para abastecimento) -->
-                        <div id="editProductFields" style="display: none;">
-                            <div class="mb-3">
-                                <label for="editProductSelect" class="form-label">Produto</label>
-                                <select class="form-select" id="editProductSelect">
-                                    <option value="" disabled selected>Selecione um produto</option>
-                                </select>
-                                <div class="invalid-feedback">
-                                    Por favor, selecione um produto.
-                                </div>
-                                <div class="form-text" id="editNoProductsWarning" style="display: none;">
-                                    Nenhum produto cadastrado para esta célula.
-                                </div>
-                            </div>
-                            
-                            <!-- Dados adicionais do produto selecionado -->
-                            <div id="editProductInfo" style="display: none;">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="editProductCode" class="form-label">Código do Produto</label>
-                                            <input type="text" class="form-control" id="editProductCode" readonly>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="editProductPO" class="form-label">PO do Fornecedor</label>
-                                            <input type="text" class="form-control" id="editProductPO">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Lista de itens do produto -->
-                            <div id="editItemsContainer" style="display: none;">
-                                <div class="mb-3">
-                                    <label class="form-label">Itens do Produto</label>
-                                    <div id="editItemsList" class="list-group">
-                                        <!-- Itens serão adicionados aqui dinamicamente -->
-                                    </div>
-                                    <div class="form-text">Selecione os itens que estão sendo abastecidos.</div>
-                                </div>
-                                
-                                <!-- Campo oculto para armazenar itens selecionados em formato JSON -->
-                                <input type="hidden" id="editSelectedItems" name="selected_items">
-                            </div>
-                        </div>
-                        
-                        <!-- Multiple Photos Upload -->
+                        <!-- Photo Upload -->
                         <div class="mb-3">
-                            <label for="editMultiplePhotosInput" class="form-label">Fotos (opcional)</label>
-                            <input type="file" class="form-control" id="editMultiplePhotosInput" accept="image/*" multiple>
-                            <div class="form-text">Você pode selecionar múltiplas fotos (até 5) para documentar o setup.</div>
+                            <label for="editPhotoInput" class="form-label">Nova Foto (opcional)</label>
+                            <input type="file" class="form-control" id="editPhotoInput" accept="image/*">
                             <div class="invalid-feedback">
-                                Por favor, selecione fotos válidas (máximo 5).
+                                Por favor, selecione uma foto válida.
                             </div>
                             
                             <!-- Hidden input to store base64 image data -->
                             <input type="hidden" id="editPhotoData" name="photo_data">
                             
-                            <!-- Multiple Images preview - Carrossel -->
-                            <div class="mt-3">
-                                <h6>Fotos do Setup:</h6>
-                                
-                                <!-- Carrossel de imagens -->
-                                <div id="editImagesCarousel" class="carousel slide mb-3" data-bs-ride="false">
-                                    <div class="carousel-indicators" id="editCarouselIndicators">
-                                        <!-- Indicadores serão adicionados aqui -->
-                                    </div>
-                                    <div class="carousel-inner" id="editCarouselInner">
-                                        <!-- Slides serão adicionados aqui -->
-                                    </div>
-                                    <button class="carousel-control-prev" type="button" data-bs-target="#editImagesCarousel" data-bs-slide="prev">
-                                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                        <span class="visually-hidden">Anterior</span>
-                                    </button>
-                                    <button class="carousel-control-next" type="button" data-bs-target="#editImagesCarousel" data-bs-slide="next">
-                                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                        <span class="visually-hidden">Próximo</span>
-                                    </button>
-                                </div>
-                                
-                                <!-- Previews em miniaturas -->
-                                <div id="editMultipleImagesPreview" class="d-flex flex-wrap gap-2">
-                                    <!-- Previews will be added here -->
-                                </div>
-                                <div id="noImageMessage" class="alert alert-warning mt-2" style="display: none;">Sem fotos disponíveis</div>
+                            <!-- Image preview -->
+                            <div class="image-preview-container mt-3">
+                                <h6>Foto Atual:</h6>
+                                <img id="editImagePreview" class="img-fluid mb-3 border rounded" style="max-height: 200px; display: none;">
+                                <div id="noImageMessage" class="alert alert-warning">Sem foto disponível</div>
                             </div>
                         </div>
                         
                         <!-- Observation -->
                         <div class="mb-3">
-                            <label for="editObservation" class="form-label">Observações (opcional)</label>
+                            <label for="editObservation" class="form-label">Observações do Abastecedor (opcional)</label>
                             <textarea class="form-control" id="editObservation" name="observation" rows="3"></textarea>
                         </div>
                         
-                        <!-- Verification Checkbox sempre true (oculto) -->
-                        <input type="hidden" id="editVerificationCheck" name="verification_check" value="true">
+                        <!-- Verification Checkbox -->
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="editVerificationCheck" name="verification_check" value="true">
+                                <label class="form-check-label" for="editVerificationCheck">
+                                    Confirmo que verifiquei o abastecimento e a remoção de itens do produto anterior
+                                </label>
+                            </div>
+                        </div>
                     </form>
                 </div>
                 <div class="modal-footer">
@@ -620,342 +556,40 @@
             return `${parts[0]}T${parts[1].substring(0, 5)}`;
         }
         
-        // Conversor de múltiplas imagens para base64
-        function handleMultipleImagesUpload(event) {
-            const files = event.target.files;
-            const imagesPreviewContainer = document.getElementById('editMultipleImagesPreview');
-            const carouselInner = document.getElementById('editCarouselInner');
-            const carouselIndicators = document.getElementById('editCarouselIndicators');
-            const noImageMessage = document.getElementById('noImageMessage');
-            const maxFiles = 5;
-            
-            // Limpar previews e imagens anteriores
-            imagesPreviewContainer.innerHTML = '';
-            carouselInner.innerHTML = '';
-            carouselIndicators.innerHTML = '';
-            
-            // Verificar número máximo de arquivos
-            if (files.length > maxFiles) {
-                event.target.classList.add('is-invalid');
+        // Conversor de imagem para base64
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) {
                 return;
             }
             
-            // Verificar se são todas imagens
-            let allImages = true;
-            for (let i = 0; i < files.length; i++) {
-                if (!files[i].type.match('image.*')) {
-                    allImages = false;
-                    break;
-                }
-            }
-            
-            if (!allImages) {
-                event.target.classList.add('is-invalid');
+            // Verificar se é uma imagem
+            if (!file.type.match('image.*')) {
+                document.getElementById('editPhotoInput').classList.add('is-invalid');
                 return;
             }
             
             // Limpar erro se existir
-            event.target.classList.remove('is-invalid');
+            document.getElementById('editPhotoInput').classList.remove('is-invalid');
             
-            // Se não houver arquivos, mostrar mensagem
-            if (files.length === 0) {
-                noImageMessage.style.display = 'block';
-                document.getElementById('editPhotoData').value = '';
-                document.getElementById('editImagesCarousel').style.display = 'none';
-                return;
-            }
-            
-            // Esconder mensagem de "sem fotos"
-            noImageMessage.style.display = 'none';
-            
-            // Mostrar carrossel se houver fotos
-            document.getElementById('editImagesCarousel').style.display = 'block';
-            
-            // Array para armazenar as imagens em base64
-            const base64Images = [];
-            let loadedImages = 0;
-            
-            // Para cada arquivo, criar um preview e converter para base64
-            Array.from(files).forEach((file, index) => {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    // Adicionar a imagem ao array de base64
-                    base64Images.push(e.target.result);
-                    
-                    // Criar preview em miniatura
-                    const previewContainer = document.createElement('div');
-                    previewContainer.className = 'position-relative';
-                    
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.className = 'img-thumbnail';
-                    img.style.width = '80px';
-                    img.style.height = '80px';
-                    img.style.objectFit = 'cover';
-                    img.style.cursor = 'pointer';
-                    img.onclick = function() {
-                        // Ir para o slide correspondente quando clicar na miniatura
-                        const carousel = new bootstrap.Carousel(document.getElementById('editImagesCarousel'));
-                        carousel.to(index);
-                    };
-                    
-                    previewContainer.appendChild(img);
-                    imagesPreviewContainer.appendChild(previewContainer);
-                    
-                    // Adicionar slide ao carrossel
-                    const carouselItem = document.createElement('div');
-                    carouselItem.className = index === 0 ? 'carousel-item active' : 'carousel-item';
-                    
-                    const slideImg = document.createElement('img');
-                    slideImg.src = e.target.result;
-                    slideImg.className = 'd-block w-100';
-                    slideImg.style.maxHeight = '400px';
-                    slideImg.style.objectFit = 'contain';
-                    
-                    carouselItem.appendChild(slideImg);
-                    carouselInner.appendChild(carouselItem);
-                    
-                    // Adicionar indicador ao carrossel
-                    const indicator = document.createElement('button');
-                    indicator.type = 'button';
-                    indicator.setAttribute('data-bs-target', '#editImagesCarousel');
-                    indicator.setAttribute('data-bs-slide-to', index.toString());
-                    if (index === 0) {
-                        indicator.className = 'active';
-                        indicator.setAttribute('aria-current', 'true');
-                    }
-                    indicator.setAttribute('aria-label', `Slide ${index + 1}`);
-                    
-                    carouselIndicators.appendChild(indicator);
-                    
-                    // Quando todas as imagens forem carregadas
-                    loadedImages++;
-                    if (loadedImages === files.length) {
-                        // Salvar array de imagens como JSON no campo oculto
-                        document.getElementById('editPhotoData').value = JSON.stringify(base64Images);
-                    }
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-        
-        // Função para carregar imagens existentes no modal de edição
-        function loadExistingImages(cellName, orderNumber, setupType) {
-            // Verificar se há imagens para este setup
-            fetch(`/api/check_images/${cellName}/${orderNumber}/${setupType}`)
-                .then(response => response.json())
-                .then(data => {
-                    const noImageMessage = document.getElementById('noImageMessage');
-                    const carouselInner = document.getElementById('editCarouselInner');
-                    const carouselIndicators = document.getElementById('editCarouselIndicators');
-                    
-                    // Limpar carrossel
-                    carouselInner.innerHTML = '';
-                    carouselIndicators.innerHTML = '';
-                    
-                    if (data.success && data.images && data.images.length > 0) {
-                        // Esconder mensagem de sem fotos
-                        noImageMessage.style.display = 'none';
-                        
-                        // Mostrar carrossel
-                        document.getElementById('editImagesCarousel').style.display = 'block';
-                        
-                        // Carregar as imagens no carrossel
-                        data.images.forEach((imagePath, index) => {
-                            // Adicionar slide ao carrossel
-                            const carouselItem = document.createElement('div');
-                            carouselItem.className = index === 0 ? 'carousel-item active' : 'carousel-item';
-                            
-                            const slideImg = document.createElement('img');
-                            slideImg.src = imagePath;
-                            slideImg.className = 'd-block w-100';
-                            slideImg.style.maxHeight = '400px';
-                            slideImg.style.objectFit = 'contain';
-                            
-                            carouselItem.appendChild(slideImg);
-                            carouselInner.appendChild(carouselItem);
-                            
-                            // Adicionar indicador ao carrossel
-                            const indicator = document.createElement('button');
-                            indicator.type = 'button';
-                            indicator.setAttribute('data-bs-target', '#editImagesCarousel');
-                            indicator.setAttribute('data-bs-slide-to', index.toString());
-                            if (index === 0) {
-                                indicator.className = 'active';
-                                indicator.setAttribute('aria-current', 'true');
-                            }
-                            indicator.setAttribute('aria-label', `Slide ${index + 1}`);
-                            
-                            carouselIndicators.appendChild(indicator);
-                        });
-                    } else {
-                        // Mostrar mensagem de sem fotos
-                        noImageMessage.style.display = 'block';
-                        document.getElementById('editImagesCarousel').style.display = 'none';
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar imagens:', error);
-                    document.getElementById('noImageMessage').style.display = 'block';
-                    document.getElementById('editImagesCarousel').style.display = 'none';
-                });
-        }
-        
-        // Função para carregar produtos de uma célula para o modal de edição
-        function loadEditProductsForCell(cellName) {
-            if (!cellName) return;
-            
-            // Esconder campos de produto inicialmente
-            document.getElementById('editProductInfo').style.display = 'none';
-            document.getElementById('editItemsContainer').style.display = 'none';
-            
-            // Buscar produtos da célula via API
-            fetch(`/api/cell_products/${cellName}`)
-                .then(response => response.json())
-                .then(data => {
-                    const productSelect = document.getElementById('editProductSelect');
-                    const noProductsWarning = document.getElementById('editNoProductsWarning');
-                    
-                    // Limpar opções anteriores, mantendo apenas a primeira (placeholder)
-                    while (productSelect.options.length > 1) {
-                        productSelect.remove(1);
-                    }
-                    
-                    if (data.products && data.products.length > 0) {
-                        // Adicionar produtos ao select
-                        data.products.forEach(product => {
-                            const option = document.createElement('option');
-                            option.value = product.code;
-                            option.textContent = product.name;
-                            option.dataset.name = product.name;
-                            productSelect.appendChild(option);
-                        });
-                        
-                        // Mostrar campos de produto
-                        document.getElementById('editProductFields').style.display = 'block';
-                        noProductsWarning.style.display = 'none';
-                    } else {
-                        // Mostrar aviso de sem produtos
-                        document.getElementById('editProductFields').style.display = 'block';
-                        noProductsWarning.style.display = 'block';
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar produtos:', error);
-                });
-        }
-        
-        // Função para carregar itens de um produto para o modal de edição
-        function loadEditItemsForProduct(cellName, productCode) {
-            if (!cellName || !productCode) return;
-            
-            // Buscar itens do produto via API
-            fetch(`/api/product_items/${cellName}/${productCode}`)
-                .then(response => response.json())
-                .then(data => {
-                    const itemsList = document.getElementById('editItemsList');
-                    
-                    // Limpar lista de itens
-                    itemsList.innerHTML = '';
-                    
-                    if (data.items && data.items.length > 0) {
-                        // Mostrar container de itens
-                        document.getElementById('editItemsContainer').style.display = 'block';
-                        
-                        // Adicionar itens à lista
-                        data.items.forEach(item => {
-                            const itemDiv = document.createElement('div');
-                            itemDiv.className = 'list-group-item d-flex justify-content-between align-items-center';
-                            
-                            // Checkbox para seleção
-                            const checkbox = document.createElement('input');
-                            checkbox.type = 'checkbox';
-                            checkbox.className = 'form-check-input me-2 edit-item-checkbox';
-                            checkbox.value = item.code;
-                            checkbox.dataset.name = item.name;
-                            
-                            // Label para o nome do item
-                            const label = document.createElement('label');
-                            label.className = 'form-check-label flex-grow-1';
-                            label.htmlFor = `item-${item.code}`;
-                            label.textContent = item.name;
-                            
-                            // Campo para PO do fornecedor para este item
-                            const poInput = document.createElement('input');
-                            poInput.type = 'text';
-                            poInput.className = 'form-control form-control-sm edit-item-po';
-                            poInput.style.width = '120px';
-                            poInput.placeholder = 'PO';
-                            poInput.dataset.itemCode = item.code;
-                            
-                            itemDiv.appendChild(checkbox);
-                            itemDiv.appendChild(label);
-                            itemDiv.appendChild(poInput);
-                            itemsList.appendChild(itemDiv);
-                        });
-                        
-                        // Adicionar evento para atualizar campo oculto quando os itens são selecionados
-                        document.querySelectorAll('.edit-item-checkbox, .edit-item-po').forEach(el => {
-                            el.addEventListener('change', updateEditSelectedItemsField);
-                        });
-                    } else {
-                        // Esconder container de itens se não houver itens
-                        document.getElementById('editItemsContainer').style.display = 'none';
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar itens:', error);
-                });
-        }
-        
-        // Função para atualizar o campo oculto com os itens selecionados
-        function updateEditSelectedItemsField() {
-            const selectedItems = [];
-            
-            // Verificar cada checkbox de item
-            document.querySelectorAll('.edit-item-checkbox:checked').forEach(checkbox => {
-                const itemCode = checkbox.value;
-                const itemName = checkbox.dataset.name;
+            // Ler arquivo como base64
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // Guardar dados da imagem
+                document.getElementById('editPhotoData').value = e.target.result;
                 
-                // Encontrar o campo PO correspondente
-                const poInput = document.querySelector(`.edit-item-po[data-item-code="${itemCode}"]`);
-                const supplierPO = poInput ? poInput.value : '';
-                
-                // Adicionar ao array de itens selecionados
-                selectedItems.push({
-                    code: itemCode,
-                    name: itemName,
-                    supplier_po: supplierPO
-                });
-            });
-            
-            // Atualizar campo oculto com JSON dos itens selecionados
-            document.getElementById('editSelectedItems').value = JSON.stringify(selectedItems);
+                // Mostrar preview
+                const imagePreview = document.getElementById('editImagePreview');
+                imagePreview.src = e.target.result;
+                imagePreview.style.display = 'block';
+                document.getElementById('noImageMessage').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
         }
         
         document.addEventListener('DOMContentLoaded', function() {
-            // Adicionar evento ao input de múltiplas fotos
-            document.getElementById('editMultiplePhotosInput').addEventListener('change', handleMultipleImagesUpload);
-            
-            // Adicionar evento para a seleção de produto no modal de edição
-            document.getElementById('editProductSelect').addEventListener('change', function() {
-                const productCode = this.value;
-                const productName = this.options[this.selectedIndex].dataset.name;
-                const cellName = document.getElementById('editCellName').value;
-                
-                if (productCode) {
-                    // Atualizar informações do produto selecionado
-                    document.getElementById('editProductCode').value = productCode;
-                    document.getElementById('editProductInfo').style.display = 'block';
-                    
-                    // Carregar itens do produto
-                    loadEditItemsForProduct(cellName, productCode);
-                } else {
-                    // Esconder campos relacionados ao produto
-                    document.getElementById('editProductInfo').style.display = 'none';
-                    document.getElementById('editItemsContainer').style.display = 'none';
-                }
-            });
+            // Adicionar evento ao input de foto
+            document.getElementById('editPhotoInput').addEventListener('change', handleImageUpload);
         
             // Adicionar evento para editar setup
             const editSetupBtns = document.querySelectorAll('.edit-setup-btn');
@@ -965,29 +599,23 @@
                     const orderNumber = this.getAttribute('data-order-number');
                     const supplierName = this.getAttribute('data-supplier-name') || '';
                     const observation = this.getAttribute('data-observation') || '';
-                    const verificationCheck = true; // Sempre true agora
+                    const verificationCheck = this.getAttribute('data-verification-check') === 'True';
                     const setupType = this.getAttribute('data-setup-type') || 'supply';
                     const timestamp = this.getAttribute('data-timestamp') || '';
-                    const productCode = this.getAttribute('data-product-code');
-                    const productName = this.getAttribute('data-product-name');
-                    const productPO = this.getAttribute('data-product-po');
-                    const selectedItems = this.getAttribute('data-selected-items');
-                    
-                    console.log('Dados recuperados para edição:', {
-                        cellName, orderNumber, setupType, productCode, productName, productPO
-                    });
+                    const hasImage = this.getAttribute('data-has-image') === 'True';
+                    const fileIdentifier = `${orderNumber}_${setupType}`;
                     
                     // Atualizar o modal com os dados
                     document.getElementById('editCellName').value = cellName;
                     document.getElementById('editOrderNumber').value = orderNumber;
                     document.getElementById('editSupplierName').value = supplierName || '';
                     document.getElementById('editObservation').value = observation;
-                    document.getElementById('editVerificationCheck').value = 'true';
+                    document.getElementById('editVerificationCheck').checked = verificationCheck;
                     document.getElementById('editSetupType').value = setupType;
                     
-                    // Resetar campo de foto
+                    // Resetar campo de foto e preview
                     document.getElementById('editPhotoData').value = '';
-                    document.getElementById('editMultiplePhotosInput').value = '';
+                    document.getElementById('editPhotoInput').value = '';
                     
                     // Converter a data/hora para o formato datetime-local
                     if (timestamp) {
@@ -995,358 +623,27 @@
                         document.getElementById('editTimestamp').value = formattedDate;
                     }
                     
-                    // Carregar imagens existentes para este setup
-                    loadExistingImages(cellName, orderNumber, setupType);
+                    // Atualizar preview da imagem se existir
+                    if (hasImage) {
+                        const imagePreview = document.getElementById('editImagePreview');
+                        const noImageMessage = document.getElementById('noImageMessage');
+                        
+                        imagePreview.src = `/photos/${cellName}/${fileIdentifier}.jpg?t=${new Date().getTime()}`;
+                        imagePreview.style.display = 'block';
+                        noImageMessage.style.display = 'none';
+                    } else {
+                        document.getElementById('editImagePreview').style.display = 'none';
+                        document.getElementById('noImageMessage').style.display = 'block';
+                    }
                     
                     // Atualizar o título do modal baseado no tipo de setup
                     const modalTitle = document.getElementById('editSetupModalLabel');
-                    
-                    // Campos de produto só aparecem no tipo 'supply'
-                    const productFields = document.getElementById('editProductFields');
-                    
                     if (setupType === 'removal') {
                         modalTitle.textContent = 'Editar Retirada de Material';
                         document.querySelector('label[for="editSupplierName"]').textContent = 'Nome do Operador da Retirada';
-                        productFields.style.display = 'none';
                     } else {
                         modalTitle.textContent = 'Editar Abastecimento de Material';
-                        
-                        // Mostrar campos de produto para abastecimento
-                        productFields.style.display = 'block';
-                        
-                        // Carregar produtos para a célula
-                        fetch(`/api/cell_products/${cellName}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.success) {
-                                const products = data.products;
-                                const productSelect = document.getElementById('editProductSelect');
-                                
-                                // Limpar opções existentes
-                                productSelect.innerHTML = '<option value="" disabled selected>Selecione um produto</option>';
-                                
-                                // Adicionar produtos ao dropdown
-                                products.forEach(product => {
-                                    const option = document.createElement('option');
-                                    option.value = product.code;
-                                    option.textContent = product.name;
-                                    productSelect.appendChild(option);
-                                });
-                                
-                                // Se temos productCode dos dados do setup, selecionar
-                                if (productCode) {
-                                    productSelect.value = productCode;
-                                    
-                                    // Mostrar informações do produto
-                                    document.getElementById('editProductInfo').style.display = 'block';
-                                    document.getElementById('editProductCode').value = productCode;
-                                    
-                                    // Preencher PO do fornecedor se existir
-                                    if (productPO) {
-                                        document.getElementById('editProductPO').value = productPO;
-                                    }
-                                    
-                                    // Agora, carregar itens para este produto
-                                    fetch(`/api/product_items/${cellName}/${productCode}`)
-                                    .then(response => response.json())
-                                    .then(data => {
-                                        if (data.success) {
-                                            const items = data.items;
-                                            const itemsList = document.getElementById('editItemsList');
-                                            itemsList.innerHTML = '';
-                                            
-                                            // Adicionar itens à lista
-                                            items.forEach(item => {
-                                                const itemRow = document.createElement('div');
-                                                itemRow.className = 'list-group-item list-group-item-action bg-dark text-light d-flex justify-content-between align-items-center';
-                                                
-                                                // Checkbox para selecionar o item
-                                                const checkbox = document.createElement('input');
-                                                checkbox.type = 'checkbox';
-                                                checkbox.className = 'form-check-input me-2 edit-item-checkbox';
-                                                checkbox.value = item.code;
-                                                checkbox.setAttribute('data-item-name', item.name);
-                                                
-                                                // Campo para PO do fornecedor para este item
-                                                const poInput = document.createElement('input');
-                                                poInput.type = 'text';
-                                                poInput.className = 'form-control form-control-sm ms-2 edit-item-po';
-                                                poInput.placeholder = 'PO do Fornecedor (opcional)';
-                                                poInput.style.maxWidth = '200px';
-                                                
-                                                // Label para o checkbox
-                                                const label = document.createElement('label');
-                                                label.className = 'form-check-label flex-grow-1';
-                                                label.textContent = `${item.name} (${item.code})`;
-                                                
-                                                // Adicionar à lista
-                                                itemRow.appendChild(checkbox);
-                                                itemRow.appendChild(label);
-                                                itemRow.appendChild(poInput);
-                                                itemsList.appendChild(itemRow);
-                                                
-                                                // Verificar se o item estava selecionado previamente
-                                                if (selectedItems) {
-                                                    try {
-                                                        const selectedItemsArray = typeof selectedItems === 'string' 
-                                                            ? JSON.parse(selectedItems) 
-                                                            : selectedItems;
-                                                            
-                                                        const selectedItem = selectedItemsArray.find(si => si.code === item.code);
-                                                        if (selectedItem) {
-                                                            checkbox.checked = true;
-                                                            if (selectedItem.po) {
-                                                                poInput.value = selectedItem.po;
-                                                            }
-                                                        }
-                                                    } catch (e) {
-                                                        console.error('Erro ao processar itens selecionados:', e);
-                                                    }
-                                                }
-                                            });
-                                            
-                                            // Exibir a lista de itens
-                                            document.getElementById('editItemsContainer').style.display = 'block';
-                                            
-                                            // Adicionar listener para atualizar o campo oculto quando os itens são alterados
-                                            const checkboxes = document.querySelectorAll('.edit-item-checkbox');
-                                            checkboxes.forEach(cb => {
-                                                cb.addEventListener('change', updateSelectedItemsField);
-                                            });
-                                            
-                                            const poInputs = document.querySelectorAll('.edit-item-po');
-                                            poInputs.forEach(input => {
-                                                input.addEventListener('input', updateSelectedItemsField);
-                                            });
-                                            
-                                            // Atualizar campo oculto com itens já selecionados
-                                            updateSelectedItemsField();
-                                        }
-                                    })
-                                    .catch(error => {
-                                        console.error('Erro ao carregar itens:', error);
-                                    });
-                                }
-                                
-                                // Adicionar listener para mudança de produto
-                                productSelect.addEventListener('change', function() {
-                                    const selectedProductCode = this.value;
-                                    if (selectedProductCode) {
-                                        document.getElementById('editProductInfo').style.display = 'block';
-                                        document.getElementById('editProductCode').value = selectedProductCode;
-                                        document.getElementById('editProductPO').value = '';
-                                        
-                                        // Carregar itens para este produto
-                                        fetch(`/api/product_items/${cellName}/${selectedProductCode}`)
-                                        .then(response => response.json())
-                                        .then(data => {
-                                            if (data.success) {
-                                                const items = data.items;
-                                                const itemsList = document.getElementById('editItemsList');
-                                                itemsList.innerHTML = '';
-                                                
-                                                // Adicionar itens à lista
-                                                items.forEach(item => {
-                                                    const itemRow = document.createElement('div');
-                                                    itemRow.className = 'list-group-item list-group-item-action bg-dark text-light d-flex justify-content-between align-items-center';
-                                                    
-                                                    // Checkbox para selecionar o item
-                                                    const checkbox = document.createElement('input');
-                                                    checkbox.type = 'checkbox';
-                                                    checkbox.className = 'form-check-input me-2 edit-item-checkbox';
-                                                    checkbox.value = item.code;
-                                                    checkbox.setAttribute('data-item-name', item.name);
-                                                    
-                                                    // Campo para PO do fornecedor para este item
-                                                    const poInput = document.createElement('input');
-                                                    poInput.type = 'text';
-                                                    poInput.className = 'form-control form-control-sm ms-2 edit-item-po';
-                                                    poInput.placeholder = 'PO do Fornecedor (opcional)';
-                                                    poInput.style.maxWidth = '200px';
-                                                    
-                                                    // Label para o checkbox
-                                                    const label = document.createElement('label');
-                                                    label.className = 'form-check-label flex-grow-1';
-                                                    label.textContent = `${item.name} (${item.code})`;
-                                                    
-                                                    // Adicionar à lista
-                                                    itemRow.appendChild(checkbox);
-                                                    itemRow.appendChild(label);
-                                                    itemRow.appendChild(poInput);
-                                                    itemsList.appendChild(itemRow);
-                                                    
-                                                    // Quando muda o produto, todos os itens começam desmarcados
-                                                });
-                                                
-                                                // Exibir a lista de itens
-                                                document.getElementById('editItemsContainer').style.display = 'block';
-                                                
-                                                // Adicionar listener para atualizar o campo oculto quando os itens são alterados
-                                                const checkboxes = document.querySelectorAll('.edit-item-checkbox');
-                                                checkboxes.forEach(cb => {
-                                                    cb.addEventListener('change', updateSelectedItemsField);
-                                                });
-                                                
-                                                const poInputs = document.querySelectorAll('.edit-item-po');
-                                                poInputs.forEach(input => {
-                                                    input.addEventListener('input', updateSelectedItemsField);
-                                                });
-                                                
-                                                // Atualizar campo oculto
-                                                updateSelectedItemsField();
-                                            }
-                                        })
-                                        .catch(error => {
-                                            console.error('Erro ao carregar itens:', error);
-                                        });
-                                    } else {
-                                        document.getElementById('editProductInfo').style.display = 'none';
-                                        document.getElementById('editItemsContainer').style.display = 'none';
-                                    }
-                                });
-                            } else {
-                                const warningElem = document.getElementById('editNoProductsWarning');
-                                warningElem.style.display = 'block';
-                                warningElem.textContent = data.message || 'Nenhum produto cadastrado para esta célula.';
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Erro ao carregar produtos:', error);
-                            document.getElementById('editNoProductsWarning').style.display = 'block';
-                            document.getElementById('editNoProductsWarning').textContent = 'Erro ao carregar produtos.';
-                        });
-                    }
                         document.querySelector('label[for="editSupplierName"]').textContent = 'Nome do Abastecedor';
-                        
-                        // Carregar produtos da célula para o tipo 'supply'
-                        loadEditProductsForCell(cellName);
-                        
-                        // Se tiver dados do produto, selecionar no formulário
-                        if (productCode && productName) {
-                            // Esperar um pouco para o dropdown carregar
-                            setTimeout(() => {
-                                const productSelect = document.getElementById('editProductSelect');
-                                
-                                // Selecionar o produto
-                                for (let i = 0; i < productSelect.options.length; i++) {
-                                    if (productSelect.options[i].value === productCode) {
-                                        productSelect.selectedIndex = i;
-                                        
-                                        // Mostrar campos de produto
-                                        document.getElementById('editProductInfo').style.display = 'block';
-                                        
-                                        // Preencher PO do produto se existir
-                                        if (productPO) {
-                                            document.getElementById('editProductPO').value = productPO;
-                                        }
-                                        
-                                        // Carregar itens para este produto
-                                        loadEditItemsForProduct(cellName, productCode);
-                                        
-                                        // Se tiver itens selecionados, marcá-los
-                                        if (selectedItems) {
-                                            try {
-                                                const items = JSON.parse(selectedItems);
-                                                document.getElementById('editSelectedItems').value = selectedItems;
-                                                
-                                                // Esperar um pouco para os checkboxes carregarem
-                                                setTimeout(() => {
-                                                    items.forEach(item => {
-                                                        // Marcar checkbox correspondente
-                                                        const checkbox = document.querySelector(`.edit-item-checkbox[value="${item.code}"]`);
-                                                        if (checkbox) {
-                                                            checkbox.checked = true;
-                                                        }
-                                                        
-                                                        // Preencher PO do item se existir
-                                                        if (item.supplier_po) {
-                                                            const poInput = document.querySelector(`.edit-item-po[data-item-code="${item.code}"]`);
-                                                            if (poInput) {
-                                                                poInput.value = item.supplier_po;
-                                                            }
-                                                        }
-                                                    });
-                                                    
-                                                    // Atualizar campo oculto com os itens selecionados
-                                                    updateEditSelectedItemsField();
-                                                }, 500);
-                                            } catch (e) {
-                                                console.error('Erro ao processar itens selecionados:', e);
-                                            }
-                                        }
-                                        
-                                        break;
-                                    }
-                                }
-                            }, 500);
-                        }
-                    }
-                    
-                    // Resetar campo de múltiplas fotos
-                    document.getElementById('editMultiplePhotosInput').value = '';
-                    
-                    // Se existir pelo menos uma imagem, mostrar no preview
-                    if (hasImage) {
-                        // Tentar buscar múltiplas imagens, verificando se existe um diretório com o padrão de nome de arquivo
-                        fetch(`/api/check_images/${cellName}/${orderNumber}/${setupType}`)
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.images && data.images.length > 0) {
-                                    // Esconder mensagem "sem fotos"
-                                    document.getElementById('noImageMessage').style.display = 'none';
-                                    
-                                    // Mostrar cada imagem no preview
-                                    data.images.forEach(imagePath => {
-                                        const previewContainer = document.createElement('div');
-                                        previewContainer.className = 'position-relative';
-                                        
-                                        const img = document.createElement('img');
-                                        img.src = imagePath + `?t=${new Date().getTime()}`; // Evitar cache
-                                        img.className = 'img-thumbnail';
-                                        img.style.width = '150px';
-                                        img.style.height = '150px';
-                                        img.style.objectFit = 'cover';
-                                        
-                                        previewContainer.appendChild(img);
-                                        multipleImagesPreview.appendChild(previewContainer);
-                                    });
-                                } else {
-                                    // Se não encontrou múltiplas imagens, mostrar a imagem única se existir
-                                    const previewContainer = document.createElement('div');
-                                    previewContainer.className = 'position-relative';
-                                    
-                                    const img = document.createElement('img');
-                                    img.src = `/photos/${cellName}/${fileIdentifier}.jpg?t=${new Date().getTime()}`;
-                                    img.className = 'img-thumbnail';
-                                    img.style.width = '150px';
-                                    img.style.height = '150px';
-                                    img.style.objectFit = 'cover';
-                                    
-                                    previewContainer.appendChild(img);
-                                    multipleImagesPreview.appendChild(previewContainer);
-                                    document.getElementById('noImageMessage').style.display = 'none';
-                                }
-                            })
-                            .catch(error => {
-                                console.error('Erro ao buscar imagens:', error);
-                                // Fallback para a imagem única
-                                const previewContainer = document.createElement('div');
-                                previewContainer.className = 'position-relative';
-                                
-                                const img = document.createElement('img');
-                                img.src = `/photos/${cellName}/${fileIdentifier}.jpg?t=${new Date().getTime()}`;
-                                img.className = 'img-thumbnail';
-                                img.style.width = '150px';
-                                img.style.height = '150px';
-                                img.style.objectFit = 'cover';
-                                
-                                previewContainer.appendChild(img);
-                                multipleImagesPreview.appendChild(previewContainer);
-                                document.getElementById('noImageMessage').style.display = 'none';
-                            });
-                    } else {
-                        // Se não houver imagem, mostrar mensagem
-                        document.getElementById('noImageMessage').style.display = 'block';
                     }
                     
                     // Abrir o modal
@@ -1356,33 +653,12 @@
             });
             
             // Botão para salvar alterações
-            // Função para atualizar o campo oculto de itens selecionados
-            function updateSelectedItemsField() {
-                const selectedItems = [];
-                const checkboxes = document.querySelectorAll('.edit-item-checkbox:checked');
-                
-                checkboxes.forEach(checkbox => {
-                    const itemCode = checkbox.value;
-                    const itemName = checkbox.getAttribute('data-item-name');
-                    const itemPO = checkbox.closest('.list-group-item').querySelector('.edit-item-po').value;
-                    
-                    selectedItems.push({
-                        code: itemCode,
-                        name: itemName,
-                        po: itemPO
-                    });
-                });
-                
-                // Atualizar o campo oculto
-                document.getElementById('editSelectedItems').value = JSON.stringify(selectedItems);
-            }
-            
             document.getElementById('saveSetupBtn').addEventListener('click', function() {
                 const cellName = document.getElementById('editCellName').value;
                 const orderNumber = document.getElementById('editOrderNumber').value;
                 const supplierName = document.getElementById('editSupplierName').value;
                 const observation = document.getElementById('editObservation').value;
-                const verificationCheck = true; // Sempre true agora
+                const verificationCheck = document.getElementById('editVerificationCheck').checked;
                 const setupType = document.getElementById('editSetupType').value;
                 const photoData = document.getElementById('editPhotoData').value;
                 const timestamp = document.getElementById('editTimestamp').value;
@@ -1395,40 +671,8 @@
                     formattedTimestamp = `${dateTime.getFullYear()}-${String(dateTime.getMonth() + 1).padStart(2, '0')}-${String(dateTime.getDate()).padStart(2, '0')} ${String(dateTime.getHours()).padStart(2, '0')}:${String(dateTime.getMinutes()).padStart(2, '0')}:00`;
                 }
                 
-                // Dados adicionais para setup do tipo supply
-                let productCode = null;
-                let productName = null;
-                let productPO = null;
-                let selectedItems = null;
-                
-                if (setupType === 'supply') {
-                    // Verificar se um produto foi selecionado
-                    const productSelect = document.getElementById('editProductSelect');
-                    if (productSelect.value) {
-                        productCode = productSelect.value;
-                        productName = productSelect.options[productSelect.selectedIndex].text;
-                        productPO = document.getElementById('editProductPO').value;
-                        selectedItems = document.getElementById('editSelectedItems').value;
-                    }
-                }
-                
                 // Salvar alterações via API
-                updateSetup(
-                    cellName, 
-                    orderNumber, 
-                    supplierName, 
-                    observation, 
-                    verificationCheck, 
-                    false, 
-                    null, 
-                    setupType, 
-                    photoData, 
-                    formattedTimestamp,
-                    productCode,
-                    productName,
-                    productPO,
-                    selectedItems
-                );
+                updateSetup(cellName, orderNumber, supplierName, observation, verificationCheck, false, null, setupType, photoData, formattedTimestamp);
             });
             
             // Adicionar evento para marcar como auditado
@@ -1439,7 +683,7 @@
                     const orderNumber = this.getAttribute('data-order-number');
                     const supplierName = this.getAttribute('data-supplier-name');
                     const observation = this.getAttribute('data-observation');
-                    const verificationCheck = true; // Sempre true agora
+                    const verificationCheck = this.getAttribute('data-verification-check') === 'True';
                     const setupType = this.getAttribute('data-setup-type') || 'supply';
                     
                     // Verificar se é ação de marcar ou desmarcar
@@ -1474,7 +718,7 @@
         });
         
         // Função para atualizar setup
-        function updateSetup(cellName, orderNumber, supplierName, observation, verificationCheck, audited, auditor_name, setupType, photoData, timestamp, productCode, productName, productPO, selectedItems) {
+        function updateSetup(cellName, orderNumber, supplierName, observation, verificationCheck, audited, auditor_name, setupType, photoData, timestamp) {
             // Preparar dados para a API
             const data = {
                 cell_name: cellName,
@@ -1497,36 +741,9 @@
                 data.photo_data = photoData;
             }
             
-            // Adicionar dados de produto, se fornecidos e for um setup de abastecimento
-            if (setupType === 'supply') {
-                if (productCode) {
-                    data.product_code = productCode;
-                }
-                if (productName) {
-                    data.product_name = productName;
-                }
-                if (productPO) {
-                    data.product_po = productPO;
-                }
-                if (selectedItems) {
-                    try {
-                        // Se selectedItems for string, tentar converter para objeto
-                        if (typeof selectedItems === 'string') {
-                            data.selected_items = JSON.parse(selectedItems);
-                        } else {
-                            data.selected_items = selectedItems;
-                        }
-                    } catch (e) {
-                        console.error('Erro ao processar itens selecionados:', e);
-                    }
-                }
-            }
-            
             if (timestamp) {
                 data.timestamp = timestamp;
             }
-            
-            // Removido código duplicado
             
             // Enviar requisição para API
             fetch('/api/update_setup', {
