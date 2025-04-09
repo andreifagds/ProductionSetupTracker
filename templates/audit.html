@@ -211,7 +211,13 @@
             {% set audited_all = 0 %}
             {% for cell_name, setups in cells.items() %}
                 {% set total_all = total_all + setups|length %}
-                {% set audited_all = audited_all + (setups|selectattr('audited', 'eq', true)|list|length) %}
+                {% set cell_audited = 0 %}
+                {% for setup in setups %}
+                    {% if setup.audited|default(false) %}
+                        {% set cell_audited = cell_audited + 1 %}
+                    {% endif %}
+                {% endfor %}
+                {% set audited_all = audited_all + cell_audited %}
             {% endfor %}
             
             <!-- Resumo Geral -->

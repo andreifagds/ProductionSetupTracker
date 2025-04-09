@@ -22,6 +22,23 @@ app.secret_key = os.environ.get("SESSION_SECRET", "setup_tracking_secret_key")
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 app.debug = True
 
+# Configurar Jinja2 para tratar corretamente comparações booleanas
+app.jinja_env.policies['ext.i18n.trimmed'] = True
+app.jinja_env.lstrip_blocks = True
+app.jinja_env.trim_blocks = True
+
+# Helpers para debugging
+@app.template_filter('is_bool')
+def is_bool(value):
+    """Verificar se um valor é booleano para debug"""
+    return isinstance(value, bool)
+
+@app.template_filter('dbg')
+def dbg(value):
+    """Debug um valor - retorna o tipo e o valor"""
+    logging.debug(f"DEBUG TEMPLATE: {type(value)} - {value}")
+    return value
+
 
 # Ensure necessary directories exist
 def ensure_dir(directory):
