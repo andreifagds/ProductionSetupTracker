@@ -282,7 +282,7 @@
                                 
                                 <!-- Submit Button -->
                                 <div class="text-center">
-                                    <button type="submit" id="finalizeButton" class="btn btn-success" disabled>
+                                    <button type="submit" id="submitSetupBtn" class="btn btn-success" disabled>
                                         <i class="fa fa-check me-2"></i> Finalizar Cadastro
                                     </button>
                                 </div>
@@ -302,7 +302,6 @@
     <script src="{{ url_for("static", filename="js/setup-form-validation.js") }}"></script>
     <script src="{{ url_for('static', filename='js/setup-products.js') }}"></script>
     <script src="{{ url_for('static', filename='js/product-selection.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/setup-form-validation.js') }}"></script>
     <script>
     // Script para carregar produtos da célula via API quando o QR code é escaneado
     document.addEventListener('DOMContentLoaded', function() {
@@ -540,7 +539,7 @@
             const photoInput = document.getElementById('photoInput');
             const imagePreview = document.getElementById('imagePreview');
             const photoData = document.getElementById('photoData');
-            const finalizeButton = document.getElementById('finalizeButton');
+            const finalizeButton = document.getElementById('submitSetupBtn');
             const setupTypeSelectionContainer = document.getElementById('setupTypeSelectionContainer');
             const setupFormContainer = document.getElementById('setupFormContainer');
             const setupTypeRemovalBtn = document.getElementById('setupTypeRemoval');
