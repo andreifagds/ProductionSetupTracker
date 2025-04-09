@@ -628,6 +628,9 @@
                     verificationLabel.textContent = 'Confirmo que verifiquei e retirei todos os materiais necessários';
                     
                     // Se temos um número de ordem já digitado, preencher o campo
+                    if (window.currentOrderNumber) {
+                        document.getElementById('orderNumber').value = window.currentOrderNumber;
+                    }
                     
                     // Mostrar formulário e esconder seleção
                     setupTypeSelectionContainer.style.display = 'none';
@@ -644,6 +647,9 @@
                     verificationLabel.textContent = 'Confirmo que verifiquei e abasteci todos os materiais necessários';
                     
                     // Se temos um número de ordem já digitado, preencher o campo
+                    if (window.currentOrderNumber) {
+                        document.getElementById('orderNumber').value = window.currentOrderNumber;
+                    }
                     
                     // Mostrar formulário e esconder seleção
                     setupTypeSelectionContainer.style.display = 'none';
