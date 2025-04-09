@@ -39,9 +39,34 @@ document.addEventListener('DOMContentLoaded', function() {
     // Expor essa função globalmente para que possa ser chamada de outros scripts
     window.validateForm = function() {
         console.log("[SETUP-VALIDATION] Validando formulário...");
+        console.log("[SETUP-VALIDATION] Tipo de setup atual:", setupType.value);
         
         // Verificar o tipo de setup (supply ou removal)
         const isSupplyType = setupType.value === 'supply';
+        
+        // Verificar campos obrigatórios para todos os tipos
+        formValidationState.orderNumber = !!orderNumber.value.trim();
+        
+        // Verificar o nome do abastecedor (depende se é perfil de supplier ou não)
+        const supplierUserContainer = document.getElementById('supplierUserContainer');
+        const supplierInputContainer = document.getElementById('supplierInputContainer');
+        
+        if (supplierUserContainer && supplierUserContainer.style.display !== 'none') {
+            // Se o container de usuário logado está visível, já temos o nome
+            formValidationState.supplierName = true;
+        } else if (supplierInputContainer && supplierInputContainer.style.display !== 'none') {
+            // Se o campo de entrada manual estiver visível, verificamos se está preenchido
+            formValidationState.supplierName = !!supplierName.value.trim();
+        } else {
+            // Caso padrão
+            formValidationState.supplierName = !!supplierName.value.trim();
+        }
+        
+        // Verificar se há fotos válidas
+        formValidationState.photo = !!photoData.value;
+        
+        // Verificar a checkbox de verificação
+        formValidationState.verification = verificationCheck.checked;
         
         // Para abastecimento (supply), também validar produto e itens
         if (isSupplyType) {
@@ -54,10 +79,14 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (formValidationState.product) {
                 // Produtos válidos
-                productSelectionElement.classList.remove('is-invalid');
-                productSelectionElement.classList.add('is-valid');
-                productCodeElement.classList.remove('is-invalid');
-                productCodeElement.classList.add('is-valid');
+                if (productSelectionElement) {
+                    productSelectionElement.classList.remove('is-invalid');
+                    productSelectionElement.classList.add('is-valid');
+                }
+                if (productCodeElement) {
+                    productCodeElement.classList.remove('is-invalid');
+                    productCodeElement.classList.add('is-valid');
+                }
                 
                 // Atualizar mensagem de ajuda
                 const productHelp = document.getElementById('productHelp');
@@ -67,10 +96,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             } else {
                 // Produtos inválidos
-                productSelectionElement.classList.add('is-invalid');
-                productSelectionElement.classList.remove('is-valid');
-                productCodeElement.classList.add('is-invalid');
-                productCodeElement.classList.remove('is-valid');
+                if (productSelectionElement) {
+                    productSelectionElement.classList.add('is-invalid');
+                    productSelectionElement.classList.remove('is-valid');
+                }
+                if (productCodeElement) {
+                    productCodeElement.classList.add('is-invalid');
+                    productCodeElement.classList.remove('is-valid');
+                }
                 
                 // Atualizar mensagem de ajuda
                 const productHelp = document.getElementById('productHelp');

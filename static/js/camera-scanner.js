@@ -505,6 +505,8 @@ function setupFormForType(setupType) {
     const operatorLabel = document.getElementById('operatorLabel');
     const verificationLabel = document.getElementById('verificationLabel');
 
+    console.log("[SETUP-FORM] Configurando formulário para o tipo:", setupType);
+
     if (setupTypeInput) {
         setupTypeInput.value = setupType;
     }
@@ -563,6 +565,12 @@ function setupFormForType(setupType) {
                 }
             }
         }
+    }
+    
+    // Forçar execução de validação após mudar o tipo
+    if (window.validateForm) {
+        console.log("[SETUP-FORM] Executando validação do formulário após mudar tipo");
+        setTimeout(window.validateForm, 100);
     }
 }
 
