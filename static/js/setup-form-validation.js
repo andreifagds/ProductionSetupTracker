@@ -297,7 +297,27 @@ document.addEventListener('DOMContentLoaded', function() {
     if (setupType) {
         setupType.addEventListener('change', function() {
             // Atualizar a validação quando o tipo de setup mudar
+            console.log("[SETUP-FORM-VALIDATION] Tipo de setup alterado para:", this.value);
             validateForm();
+        });
+    }
+    
+    // Adicionar um listener de submit para o formulário para garantir o envio
+    if (setupForm) {
+        setupForm.addEventListener('submit', function(event) {
+            console.log("[SETUP-FORM-VALIDATION] Formulário sendo enviado, verificando validade final");
+            const isValid = validateForm();
+            
+            if (!isValid) {
+                console.log("[SETUP-FORM-VALIDATION] Formulário inválido, impedindo submissão");
+                event.preventDefault();
+                event.stopPropagation();
+                return false;
+            }
+            
+            console.log("[SETUP-FORM-VALIDATION] Formulário válido, prosseguindo com envio");
+            // O formulário será enviado normalmente
+            return true;
         });
     }
     

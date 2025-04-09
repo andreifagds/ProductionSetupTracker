@@ -94,11 +94,63 @@ document.addEventListener('DOMContentLoaded', function() {
     const setupForm = document.getElementById('setupForm');
     if (setupForm) {
         setupForm.addEventListener('submit', function(event) {
+            console.log("Formulário sendo enviado, verificando validade");
+            
+            // Para depuração: Exibe todos os campos do formulário
+            const formData = new FormData(setupForm);
+            console.log("Valores do formulário:");
+            for (let [key, value] of formData.entries()) {
+                console.log(`${key}: ${value}`);
+            }
+            
+            // Verificar validade do formulário
             if (!setupForm.checkValidity()) {
+                console.log("Formulário inválido, impedindo envio");
                 event.preventDefault();
                 event.stopPropagation();
+                setupForm.classList.add('was-validated');
+                alert("Por favor, preencha todos os campos obrigatórios.");
+                return false;
             }
+            
+            // Garantir que temos um valor para o QR code e célula
+            const cellNameInput = document.getElementById('cellName');
+            if (!cellNameInput || !cellNameInput.value) {
+                console.log("Célula não definida, impedindo envio");
+                event.preventDefault();
+                event.stopPropagation();
+                alert("Error: Célula não definida. Por favor, escaneie o QR code novamente.");
+                return false;
+            }
+            
+            // Verificar tipo de setup e suas validações específicas
+            const setupType = document.getElementById('setupType');
+            if (setupType && setupType.value === 'supply') {
+                // Para abastecimento, verificar se temos produtos selecionados
+                const productCodeInput = document.getElementById('product_code');
+                if (productCodeInput && productCodeInput.required && (!productCodeInput.value || productCodeInput.value.trim() === '')) {
+                    console.log("Produto não selecionado para abastecimento");
+                    event.preventDefault();
+                    event.stopPropagation();
+                    alert("Para abastecimento, você deve selecionar um produto.");
+                    return false;
+                }
+            }
+            
+            // Desabilitar o botão para evitar envios múltiplos
+            const submitBtn = document.getElementById('submitSetupBtn');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Enviando...';
+                console.log("Botão de envio desabilitado para prevenir múltiplos envios");
+            }
+            
+            // Adicionar classe para ativar feedback visual
             setupForm.classList.add('was-validated');
+            
+            console.log("Formulário válido, prosseguindo com o envio");
+            // O formulário será enviado normalmente
+            return true;
         });
 
         // Handle photo upload
@@ -180,9 +232,13 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             // Atualizar o contador de imagens
                             const imageCounter = document.getElementById('imageCounter');
-                            imageCounter.classList.remove('d-none');
-                            const badge = imageCounter.querySelector('.badge');
-                            badge.textContent = `${processedCount} ${processedCount === 1 ? 'imagem selecionada' : 'imagens selecionadas'}`;
+                            if (imageCounter) {
+                                imageCounter.classList.remove('d-none');
+                                const badge = imageCounter.querySelector('.badge');
+                                if (badge) {
+                                    badge.textContent = `${processedCount} ${processedCount === 1 ? 'imagem selecionada' : 'imagens selecionadas'}`;
+                                }
+                            }
                             
                             // Quando todas as imagens forem processadas
                             if (processedCount === files.length) {
@@ -198,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 // Adicionar controles do carrossel se houver mais de uma imagem
                                 const carousel = document.getElementById('imagesCarousel');
                                 
-                                if (processedCount > 1 && !carousel.querySelector('.carousel-control-prev')) {
+                                if (carousel && processedCount > 1 && !carousel.querySelector('.carousel-control-prev')) {
                                     // Adicionar botões de navegação
                                     const prevButton = document.createElement('button');
                                     prevButton.className = 'carousel-control-prev';
@@ -237,11 +293,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Check if we need to enable/disable the submit button
         const verificationCheckbox = document.getElementById('verificationCheck');
-        const finalizeButton = document.getElementById('finalizeButton');
+        const finalizeButton = document.getElementById('submitSetupBtn');
         
         if (verificationCheckbox && finalizeButton) {
             function updateButtonState() {
+                console.log("[SETUP-BUTTON] Atualizando estado do botão");
                 const orderNumberValid = document.getElementById('orderNumber').value.trim() !== '';
+                console.log("[SETUP-BUTTON] orderNumberValid:", orderNumberValid);
                 
                 // Verificar o perfil do usuário (se é supplier ou não)
                 const userProfile = document.getElementById('supplierUserContainer');
@@ -257,11 +315,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         supplierNameValid = supplierNameInput.value.trim() !== '';
                     }
                 }
+                console.log("[SETUP-BUTTON] supplierNameValid:", supplierNameValid);
                 
                 // Verificar se temos pelo menos uma imagem
                 const photoValid = photoDataInput.value !== '';
+                console.log("[SETUP-BUTTON] photoValid:", photoValid);
                 const checkboxValid = verificationCheckbox.checked;
+                console.log("[SETUP-BUTTON] checkboxValid:", checkboxValid);
                 
+                console.log("[SETUP-BUTTON] Habilitando botão:", orderNumberValid && supplierNameValid && photoValid && checkboxValid);
                 finalizeButton.disabled = !(orderNumberValid && supplierNameValid && photoValid && checkboxValid);
             }
             
