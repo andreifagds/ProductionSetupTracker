@@ -55,15 +55,6 @@
                                     <a href="{{ url_for('audit') }}" class="btn btn-info main-btn me-md-2 mb-2">
                                         <i class="fa fa-search me-2"></i> Auditar
                                     </a>
-                                    <a href="{{ url_for('register_qrcode') }}" class="btn btn-secondary main-btn me-md-2 mb-2">
-                                        <i class="fa fa-qrcode me-2"></i> Cadastrar Novo QR Code
-                                    </a>
-                                    <a href="{{ url_for('product_management') }}" class="btn btn-success main-btn me-md-2 mb-2">
-                                        <i class="fa fa-cubes me-2"></i> Gerenciar Produtos
-                                    </a>
-                                    <a href="{{ url_for('update_qrcodes_format_route') }}" class="btn btn-warning main-btn me-md-2 mb-2">
-                                        <i class="fa fa-refresh me-2"></i> Atualizar QR Codes
-                                    </a>
                                 {% endif %}
                             {% else %}
                                 <a href="{{ url_for('login') }}" class="btn btn-primary main-btn me-md-2 mb-2">
@@ -77,6 +68,20 @@
 
                 <!-- User Status -->
                 <div class="mt-4 text-center">
+                    {% if session.get('logged_in') and user_profile == 'auditor' %}
+                        <div class="d-flex flex-wrap justify-content-center mb-3">
+                            <a href="{{ url_for('register_qrcode') }}" class="btn btn-sm btn-outline-secondary me-2 mb-2">
+                                <i class="fa fa-qrcode me-1"></i> Cadastrar Novo QR Code
+                            </a>
+                            <a href="{{ url_for('product_management') }}" class="btn btn-sm btn-outline-success me-2 mb-2">
+                                <i class="fa fa-cubes me-1"></i> Gerenciar Produtos
+                            </a>
+                            <a href="{{ url_for('cadastro_usuarios') }}" class="btn btn-sm btn-outline-primary me-2 mb-2">
+                                <i class="fa fa-users me-1"></i> Gerenciar Usuários
+                            </a>
+                        </div>
+                    {% endif %}
+                    
                     {% if session.get('logged_in') %}
                         <div class="user-profile-container mb-3">
                             <span>Logado como: <strong>{{ session.get('username') }}</strong></span>
