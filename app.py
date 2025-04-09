@@ -1724,11 +1724,20 @@ def api_mark_as_audited():
     if not session.get('logged_in'):
         return jsonify({"success": False, "message": "Unauthorized"}), 401
     
-    data = request.json
+    # Aceitar dados tanto via JSON quanto via FormData
+    if request.is_json:
+        data = request.json
+    else:
+        data = request.form
+    
+    # Log para debug
+    logging.debug(f"API mark_as_audited: Recebido dados: {data}")
+    
     auditor_name = session.get('username')
     
     # Verificar se é para marcar ou desmarcar
-    is_mark_action = data.get('is_mark', True)
+    audited = data.get('audited')
+    is_mark_action = audited not in ['false', 'False', False, '0', 0]
     audit_notes = data.get('audit_notes', '')
     
     # Verificar se o usuário tem perfil de auditor
@@ -1843,7 +1852,15 @@ def api_delete_setup():
     if user_profile != 'auditor':
         return jsonify({"success": False, "message": "Somente auditores podem excluir registros"}), 403
     
-    data = request.json
+    # Aceitar dados tanto via JSON quanto via FormData
+    if request.is_json:
+        data = request.json
+    else:
+        data = request.form
+    
+    # Log para debug
+    logging.debug(f"API delete_setup: Recebido dados: {data}")
+    
     cell_name = data.get('cell_name')
     order_number = data.get('order_number')
     setup_type = data.get('setup_type')
@@ -1888,43 +1905,92 @@ def get_setup_images(cell_name, order_number, setup_type):
     Returns:
         JSON com a lista de imagens disponíveis para o setup
     """
-    cell_dir = os.path.join(DATA_DIR, cell_name)
-    setup_identifier = f"{order_number}_{setup_type}"
-    
-    # Primeiro, verificar se existe um subdiretório para este setup (novo formato)
-    setup_dir = os.path.join(cell_dir, setup_identifier)
-    
-    if os.path.isdir(setup_dir):
-        # Obtém a lista de arquivos de imagem no subdiretório
-        images = []
-        for filename in os.listdir(setup_dir):
-            if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
-                # Criar URL completa para a imagem
-                image_url = url_for('get_photo', cell_name=cell_name, filepath=f"{setup_identifier}/{filename}")
-                images.append(image_url)
-                
-        # Ordenar imagens pelo nome (normalmente image_1.jpg, image_2.jpg, etc)
-        images.sort()
+    try:
+        logging.debug(f"Buscando imagens para cell={cell_name}, order={order_number}, type={setup_type}")
+        cell_dir = os.path.join(DATA_DIR, cell_name)
         
-        return jsonify({
-            "success": True,
-            "images": images
-        })
-    else:
-        # Se não encontrar um diretório, verificar se existe a imagem no formato antigo
-        old_format_path = os.path.join(cell_dir, f"{setup_identifier}.jpg")
-        if os.path.isfile(old_format_path):
-            # Criar URL completa para a imagem
-            image_url = url_for('get_photo', cell_name=cell_name, filepath=f"{setup_identifier}.jpg")
+        if not os.path.isdir(cell_dir):
+            logging.error(f"Diretório da célula não existe: {cell_dir}")
+            return jsonify({"success": False, "images": [], "error": "Diretório da célula não encontrado"})
+        
+        # Lista de possíveis diretórios/arquivos para verificar
+        # Primeiro tentamos encontrar um diretório com o nome completo do setup (formato novo)
+        # Se não encontrarmos, buscamos arquivos diretos (formato antigo)
+        
+        # Listar todos os arquivos no diretório da célula
+        all_files = os.listdir(cell_dir)
+        logging.debug(f"Arquivos encontrados na célula: {all_files}")
+        
+        # As imagens agora usam o timestamp como parte do nome do diretório
+        # Vamos procurar diretórios que tenham ordem e tipo no nome
+        matching_dirs = []
+        for item in all_files:
+            # Verificar se o item tem o padrão {order_number}_{setup_type}
+            item_path = os.path.join(cell_dir, item)
+            if os.path.isdir(item_path) and f"{order_number}_{setup_type}" in item:
+                matching_dirs.append(item)
+        
+        logging.debug(f"Diretórios correspondentes encontrados: {matching_dirs}")
+        
+        # Se encontramos diretórios correspondentes, buscamos imagens dentro deles
+        if matching_dirs:
+            for dir_name in matching_dirs:
+                dir_path = os.path.join(cell_dir, dir_name)
+                images = []
+                
+                if os.path.isdir(dir_path):
+                    # Listar todos os arquivos no diretório
+                    dir_files = os.listdir(dir_path)
+                    logging.debug(f"Arquivos no diretório {dir_name}: {dir_files}")
+                    
+                    for filename in dir_files:
+                        if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                            # Criar URL completa para a imagem
+                            image_url = url_for('get_photo', cell_name=cell_name, filepath=f"{dir_name}/{filename}")
+                            images.append(image_url)
+                    
+                    # Se encontramos imagens, retornamos
+                    if images:
+                        # Ordenar imagens pelo nome (normalmente image_1.jpg, image_2.jpg, etc)
+                        images.sort()
+                        logging.debug(f"Imagens encontradas: {images}")
+                        return jsonify({
+                            "success": True,
+                            "images": images
+                        })
+        
+        # Se não encontramos em diretórios dedicados, procuramos por arquivos diretos
+        # com o mesmo padrão de nome
+        direct_images = []
+        for file in all_files:
+            file_path = os.path.join(cell_dir, file)
+            # Verificar se é um arquivo de imagem e se contém o nome da ordem
+            if os.path.isfile(file_path) and file.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                if order_number in file:
+                    image_url = url_for('get_photo', cell_name=cell_name, filepath=file)
+                    direct_images.append(image_url)
+        
+        if direct_images:
+            logging.debug(f"Imagens diretas encontradas: {direct_images}")
             return jsonify({
                 "success": True,
-                "images": [image_url]
+                "images": direct_images
             })
         
-        # Se não encontrar nenhuma imagem
+        # Se não encontramos imagens em nenhum lugar
+        logging.warning(f"Nenhuma imagem encontrada para o setup: {order_number}_{setup_type}")
         return jsonify({
             "success": False,
             "images": []
+        })
+    except Exception as e:
+        logging.error(f"Erro ao buscar imagens: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "images": [],
+            "error": str(e)
         })
 
 def reset_cell_flow(cell_name, reason):
@@ -2033,7 +2099,15 @@ def api_reset_cell():
     if user_profile != 'auditor':
         return jsonify({"success": False, "message": "Somente auditores podem resetar o fluxo da célula"}), 403
     
-    data = request.json
+    # Aceitar dados tanto via JSON quanto via FormData
+    if request.is_json:
+        data = request.json
+    else:
+        data = request.form
+    
+    # Log para debug
+    logging.debug(f"API reset_cell: Recebido dados: {data}")
+    
     cell_name = data.get('cell_name')
     reset_reason = data.get('reset_reason')
     
