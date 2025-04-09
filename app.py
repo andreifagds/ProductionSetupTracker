@@ -892,7 +892,7 @@ def get_all_setups():
     
     return cells
 
-def update_setup(cell_name, order_number, supplier_name, observation, verification_check, audited=None, auditor_name=None, setup_type=None, photo_data=None, timestamp=None, audit_notes=None):
+def update_setup(cell_name, order_number, supplier_name, observation, verification_check, audited=None, auditor_name=None, setup_type=None, photo_data=None, timestamp=None, audit_notes=None, old_order_number=None, product_code=None, product_name=None, product_po=None, selected_items=None):
     """Update an existing setup data file."""
     # Normalizar o valor de verification_check para booleano
     if isinstance(verification_check, str):
@@ -907,9 +907,12 @@ def update_setup(cell_name, order_number, supplier_name, observation, verificati
     # Procurar por arquivos que correspondam ao padrão
     text_file_path = None
     
+    # Se foi fornecido um valor antigo para order_number, usá-lo para procurar o arquivo
+    search_order_number = old_order_number if old_order_number else order_number
+    
     # Se temos um tipo de setup específico, vamos procurar arquivos com esse padrão
     if setup_type:
-        prefix = f"{order_number}_{setup_type}"
+        prefix = f"{search_order_number}_{setup_type}"
         matching_files = []
         
         for file in os.listdir(cell_dir):
@@ -930,7 +933,7 @@ def update_setup(cell_name, order_number, supplier_name, observation, verificati
         matching_files = []
         
         for file in os.listdir(cell_dir):
-            if file.endswith(".txt") and file.startswith(f"{order_number}_"):
+            if file.endswith(".txt") and file.startswith(f"{search_order_number}_"):
                 matching_files.append(file)
         
         if matching_files:
@@ -940,7 +943,7 @@ def update_setup(cell_name, order_number, supplier_name, observation, verificati
             text_file_path = os.path.join(cell_dir, matching_files[-1])
             logging.debug(f"Arquivo encontrado para atualização (sem tipo especificado): {text_file_path}")
         else:
-            logging.error(f"Nenhum arquivo encontrado para order_number={order_number} na célula {cell_name}")
+            logging.error(f"Nenhum arquivo encontrado para order_number={search_order_number} na célula {cell_name}")
             return False
     
     try:
@@ -952,9 +955,26 @@ def update_setup(cell_name, order_number, supplier_name, observation, verificati
         data["observation"] = observation
         data["verification_check"] = verification_check
         
+        # Atualizar o número da ordem, se diferente
+        if order_number != data.get("order_number") and old_order_number:
+            logging.debug(f"Número da ordem alterado de {data.get('order_number')} para {order_number}")
+            data["order_number"] = order_number
+            
         # Atualizar o timestamp se fornecido
         if timestamp:
             data["timestamp"] = timestamp
+            
+        # Atualizar dados de produto para setups de abastecimento
+        if setup_type == 'supply':
+            # Atualizar código/nome do produto se fornecidos
+            if product_code:
+                data["product_code"] = product_code
+            if product_name:
+                data["product_name"] = product_name
+            if product_po:
+                data["product_po"] = product_po
+            if selected_items:
+                data["selected_items"] = selected_items
         
         # Update audit fields if provided
         if audited is not None:
@@ -1686,7 +1706,13 @@ def api_update_setup():
         data.get('auditor_name'),
         data.get('setup_type'),
         data.get('photo_data'),
-        data.get('timestamp')
+        data.get('timestamp'),
+        audit_notes=data.get('audit_notes'),
+        old_order_number=data.get('old_order_number'),
+        product_code=data.get('product_code'),
+        product_name=data.get('product_name'),
+        product_po=data.get('product_po'),
+        selected_items=data.get('selected_items')
     )
     
     if success:
