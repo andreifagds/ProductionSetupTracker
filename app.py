@@ -1518,6 +1518,32 @@ def audit():
                 
         cells = filtered_cells
     
+    # Garantir que todos os dados estão no formato correto
+    for cell_name, setups in cells.items():
+        for setup in setups:
+            # Garantir que o campo audited é um booleano
+            if isinstance(setup.get('audited'), str):
+                setup['audited'] = setup['audited'].lower() in ['true', 'yes', '1', 'on']
+            setup['audited'] = bool(setup.get('audited', False))
+            
+            # Garantir que selected_items é uma lista
+            if 'selected_items' not in setup or setup['selected_items'] is None:
+                setup['selected_items'] = []
+            elif isinstance(setup.get('selected_items'), str):
+                try:
+                    setup['selected_items'] = json.loads(setup['selected_items'])
+                except:
+                    setup['selected_items'] = []
+    
+    # Adicionar logs para depuração dos contadores
+    total_geral = 0
+    auditados_geral = 0
+    for cell_name, setups in cells.items():
+        total_geral += len(setups)
+        auditados_geral += sum(1 for setup in setups if setup.get('audited', False))
+    
+    logging.debug(f"Contadores gerais - Total: {total_geral}, Auditados: {auditados_geral}")
+    
     return render_template('audit.html', cells=cells)
 
 @app.route('/register_qrcode', methods=['GET', 'POST'])

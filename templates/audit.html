@@ -641,9 +641,10 @@
                 // Obter itens selecionados do produto
                 const selectedItemsAttr = setupCard.getAttribute('data-selected-items');
                 try {
-                    setupData.selectedItems = selectedItemsAttr ? JSON.parse(selectedItemsAttr) : [];
+                    setupData.selectedItems = selectedItemsAttr ? JSON.parse(selectedItemsAttr.replace(/&quot;/g, '"')) : [];
+                    console.log('Itens selecionados carregados:', setupData.selectedItems);
                 } catch (e) {
-                    console.error('Erro ao processar itens selecionados:', e);
+                    console.error('Erro ao processar itens selecionados:', e, selectedItemsAttr);
                     setupData.selectedItems = [];
                 }
             }
