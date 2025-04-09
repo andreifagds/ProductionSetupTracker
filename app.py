@@ -195,6 +195,53 @@ def save_qrcode(qrcode_value, cell_name):
     
     with open(os.path.join(DATA_DIR, "qrcodes.json"), 'w') as f:
         json.dump(qrcodes, f)
+        
+def update_qrcode(qrcode_value, new_cell_name):
+    """Atualizar um QR code existente.
+    
+    Args:
+        qrcode_value: Valor do QR code 
+        new_cell_name: Novo nome da célula
+        
+    Returns:
+        bool: True se atualizado com sucesso, False caso contrário
+    """
+    qrcodes = get_qrcodes()
+    
+    if qrcode_value in qrcodes:
+        if isinstance(qrcodes[qrcode_value], dict):
+            qrcodes[qrcode_value]["cell_name"] = new_cell_name
+        else:
+            # Converter formato antigo para novo
+            qrcodes[qrcode_value] = {
+                "cell_name": new_cell_name,
+                "products": []
+            }
+        
+        with open(os.path.join(DATA_DIR, "qrcodes.json"), 'w') as f:
+            json.dump(qrcodes, f)
+        return True
+    
+    return False
+    
+def delete_qrcode(qrcode_value):
+    """Excluir um QR code.
+    
+    Args:
+        qrcode_value: Valor do QR code a ser excluído
+        
+    Returns:
+        bool: True se excluído com sucesso, False caso contrário
+    """
+    qrcodes = get_qrcodes()
+    
+    if qrcode_value in qrcodes:
+        del qrcodes[qrcode_value]
+        with open(os.path.join(DATA_DIR, "qrcodes.json"), 'w') as f:
+            json.dump(qrcodes, f)
+        return True
+    
+    return False
 
 
 # Função para atualizar o formato dos QR codes (se necessário)
@@ -1436,19 +1483,74 @@ def register_qrcode():
         flash('Acesso restrito. Apenas auditores podem acessar esta página.', 'danger')
         return redirect(url_for('index'))
     
-    if request.method == 'POST':
-        qrcode_value = request.form.get('qrcode_value')
-        cell_name = request.form.get('cell_name')
-        
-        if not all([qrcode_value, cell_name]):
-            flash('QR Code e nome da célula são obrigatórios', 'danger')
-            return redirect(url_for('register_qrcode'))
-        
-        save_qrcode(qrcode_value, cell_name)
-        flash('QR Code cadastrado com sucesso!', 'success')
-        return redirect(url_for('index'))
+    # Obter lista de células para exibir na página
+    cells = get_all_cells()
     
-    return render_template('register_qrcode.html')
+    if request.method == 'POST':
+        action = request.form.get('action', 'add')
+        
+        if action == 'add':
+            qrcode_value = request.form.get('qrcode_value')
+            cell_name = request.form.get('cell_name')
+            
+            if not all([qrcode_value, cell_name]):
+                flash('QR Code e nome da célula são obrigatórios', 'danger')
+                return redirect(url_for('register_qrcode'))
+            
+            save_qrcode(qrcode_value, cell_name)
+            flash('QR Code cadastrado com sucesso!', 'success')
+            return redirect(url_for('register_qrcode'))
+    
+    return render_template('register_qrcode.html', cells=cells)
+
+@app.route('/edit_qrcode', methods=['POST'])
+def edit_qrcode():
+    """Handle QR code update."""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        return jsonify({"success": False, "message": "Acesso restrito"}), 403
+    
+    qrcode_value = request.form.get('qrcode_value')
+    new_cell_name = request.form.get('new_cell_name')
+    
+    if not all([qrcode_value, new_cell_name]):
+        return jsonify({"success": False, "message": "QR Code e nome da célula são obrigatórios"}), 400
+    
+    if update_qrcode(qrcode_value, new_cell_name):
+        return jsonify({"success": True, "message": "QR Code atualizado com sucesso!"})
+    else:
+        return jsonify({"success": False, "message": "QR Code não encontrado"}), 404
+
+@app.route('/delete_qrcode', methods=['POST'])
+def delete_qrcode_route():
+    """Handle QR code deletion."""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        return jsonify({"success": False, "message": "Acesso restrito"}), 403
+    
+    qrcode_value = request.form.get('qrcode_value')
+    
+    if not qrcode_value:
+        return jsonify({"success": False, "message": "QR Code é obrigatório"}), 400
+    
+    if delete_qrcode(qrcode_value):
+        return jsonify({"success": True, "message": "QR Code excluído com sucesso!"})
+    else:
+        return jsonify({"success": False, "message": "QR Code não encontrado"}), 404
 
 @app.route('/api/get_cell_name/<qrcode>')
 def api_get_cell_name(qrcode):

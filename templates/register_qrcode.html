@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cadastrar QR Code | Sistema de Setup de Células</title>
+    <title>Gerenciar QR Codes | Sistema de Setup de Células</title>
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/custom-green-theme.css') }}" rel="stylesheet">
@@ -13,8 +13,8 @@
     <div class="container main-container">
         <!-- Header -->
         <div class="app-header">
-            <h1 class="app-title">Cadastrar Novo QR Code</h1>
-            <p class="app-subtitle">Associe um QR Code a uma célula de produção</p>
+            <h1 class="app-title">Gerenciar QR Codes</h1>
+            <p class="app-subtitle">Cadastre, visualize, edite ou exclua QR Codes de células de produção</p>
         </div>
 
         <!-- Back button -->
@@ -41,7 +41,7 @@
             <div class="col-md-8">
                 <div class="card">
                     <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">Escaneie o QR Code</h5>
+                        <h5 class="mb-0">Cadastrar Novo QR Code</h5>
                     </div>
                     <div class="card-body">
                         <div id="scanBtnContainer">
@@ -67,7 +67,7 @@
         </div>
 
         <!-- Register QR Code Form -->
-        <div class="row justify-content-center">
+        <div class="row justify-content-center mb-4">
             <div class="col-md-8">
                 <div class="card">
                     <div class="card-header bg-primary text-white">
@@ -75,6 +75,7 @@
                     </div>
                     <div class="card-body">
                         <form action="{{ url_for('register_qrcode') }}" method="POST" class="needs-validation" novalidate>
+                            <input type="hidden" name="action" value="add">
                             <!-- QR Code Value (hidden) -->
                             <input type="hidden" id="qrcodeValue" name="qrcode_value" required>
                             
@@ -99,6 +100,108 @@
                 </div>
             </div>
         </div>
+
+        <!-- Lista de QR Codes Cadastrados -->
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <div class="card">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">QR Codes Cadastrados</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if cells and cells|length > 0 %}
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle" id="cellsTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>QR Code</th>
+                                            <th>Nome da Célula</th>
+                                            <th>Produtos</th>
+                                            <th class="text-end">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for cell in cells %}
+                                            <tr>
+                                                <td><span class="qrcode-value">{{ cell.qrcode }}</span></td>
+                                                <td>{{ cell.cell_name }}</td>
+                                                <td>
+                                                    <span class="badge bg-info">{{ cell.product_count }}</span>
+                                                </td>
+                                                <td class="text-end">
+                                                    <button type="button" 
+                                                            class="btn btn-sm btn-primary edit-cell-btn" 
+                                                            data-qrcode="{{ cell.qrcode }}" 
+                                                            data-cell-name="{{ cell.cell_name }}">
+                                                        <i class="fa fa-edit"></i>
+                                                    </button>
+                                                    <button type="button" 
+                                                            class="btn btn-sm btn-danger delete-cell-btn" 
+                                                            data-qrcode="{{ cell.qrcode }}" 
+                                                            data-cell-name="{{ cell.cell_name }}">
+                                                        <i class="fa fa-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info">
+                                <i class="fa fa-info-circle me-2"></i> Nenhum QR Code cadastrado ainda.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Editar Célula -->
+    <div class="modal fade" id="editCellModal" tabindex="-1" aria-labelledby="editCellModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="editCellModalLabel">Editar Célula</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="editCellForm">
+                    <div class="modal-body">
+                        <input type="hidden" id="editQRCodeValue" name="qrcode_value">
+                        
+                        <div class="mb-3">
+                            <label for="editCellName" class="form-label">Nome da Célula</label>
+                            <input type="text" class="form-control" id="editCellName" name="new_cell_name" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação para Excluir -->
+    <div class="modal fade" id="deleteCellModal" tabindex="-1" aria-labelledby="deleteCellModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteCellModalLabel">Confirmar Exclusão</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Tem certeza que deseja excluir o QR Code associado à célula <strong id="deleteCellName"></strong>?</p>
+                    <p class="text-danger"><i class="fa fa-exclamation-triangle me-2"></i> Esta ação não pode ser desfeita!</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Excluir</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -106,6 +209,107 @@
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/camera-scanner.js') }}"></script>
+    
+    <script>
+        // Gerenciamento de QR Codes
+        document.addEventListener('DOMContentLoaded', function() {
+            // Inicializar modais
+            const editCellModal = new bootstrap.Modal(document.getElementById('editCellModal'));
+            const deleteCellModal = new bootstrap.Modal(document.getElementById('deleteCellModal'));
+            
+            // Botões de edição
+            document.querySelectorAll('.edit-cell-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const qrcode = this.getAttribute('data-qrcode');
+                    const cellName = this.getAttribute('data-cell-name');
+                    
+                    document.getElementById('editQRCodeValue').value = qrcode;
+                    document.getElementById('editCellName').value = cellName;
+                    
+                    editCellModal.show();
+                });
+            });
+            
+            // Botões de exclusão
+            document.querySelectorAll('.delete-cell-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const qrcode = this.getAttribute('data-qrcode');
+                    const cellName = this.getAttribute('data-cell-name');
+                    
+                    document.getElementById('deleteCellName').textContent = cellName;
+                    document.getElementById('confirmDeleteBtn').setAttribute('data-qrcode', qrcode);
+                    
+                    deleteCellModal.show();
+                });
+            });
+            
+            // Formulário de edição
+            document.getElementById('editCellForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const qrcodeValue = document.getElementById('editQRCodeValue').value;
+                const newCellName = document.getElementById('editCellName').value;
+                
+                // Enviar solicitação para atualizar a célula
+                const formData = new FormData();
+                formData.append('qrcode_value', qrcodeValue);
+                formData.append('new_cell_name', newCellName);
+                
+                fetch('/edit_qrcode', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Fechar modal
+                        editCellModal.hide();
+                        
+                        // Mostrar mensagem de sucesso e recarregar página
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert('Erro ao atualizar: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao enviar solicitação:', error);
+                    alert('Ocorreu um erro ao processar sua solicitação.');
+                });
+            });
+            
+            // Botão de confirmação de exclusão
+            document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+                const qrcodeValue = this.getAttribute('data-qrcode');
+                
+                // Enviar solicitação para excluir a célula
+                const formData = new FormData();
+                formData.append('qrcode_value', qrcodeValue);
+                
+                fetch('/delete_qrcode', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Fechar modal
+                        deleteCellModal.hide();
+                        
+                        // Mostrar mensagem de sucesso e recarregar página
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert('Erro ao excluir: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao enviar solicitação:', error);
+                    alert('Ocorreu um erro ao processar sua solicitação.');
+                });
+            });
+        });
+    </script>
     
     <style>
         /* Adicionar estilos adicionais para o scanner */
@@ -140,6 +344,26 @@
         #scannerMessage {
             margin-top: 15px;
             font-weight: bold;
+        }
+        
+        /* Estilos para a tabela de células */
+        .qrcode-value {
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #777;
+        }
+        
+        #cellsTable td {
+            vertical-align: middle;
+        }
+        
+        /* Restringir tamanho da coluna QR Code */
+        #cellsTable th:first-child,
+        #cellsTable td:first-child {
+            max-width: 180px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
     </style>
 </body>
