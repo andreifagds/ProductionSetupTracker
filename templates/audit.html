@@ -26,7 +26,7 @@
 
         <!-- Alert Container for AJAX responses -->
         <div id="alertContainer"></div>
-        
+
         <!-- Modal para anotações de auditoria -->
         <div class="modal fade" id="auditNotesModal" tabindex="-1" aria-labelledby="auditNotesModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
@@ -139,7 +139,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <!-- Status de Auditoria -->
                             <div class="col-12">
                                 <label for="filter_audited" class="form-label small">Status de Auditoria</label>
@@ -149,7 +149,7 @@
                                     <option value="nao" {% if request.args.get('filter_audited') == 'nao' %}selected{% endif %}>Não Auditados</option>
                                 </select>
                             </div>
-                            
+
                             <!-- Nome do Auditor -->
                             <div class="col-6">
                                 <label for="filter_auditor" class="form-label small">Nome do Auditor</label>
@@ -159,7 +159,7 @@
                                         placeholder="Auditor" value="{{ request.args.get('filter_auditor', '') }}">
                                 </div>
                             </div>
-                            
+
                             <!-- Nome do Abastecedor -->
                             <div class="col-6">
                                 <label for="filter_supplier" class="form-label small">Nome do Abastecedor</label>
@@ -169,7 +169,7 @@
                                         placeholder="Abastecedor" value="{{ request.args.get('filter_supplier', '') }}">
                                 </div>
                             </div>
-                            
+
                             <!-- Ordem de Produção -->
                             <div class="col-6">
                                 <label for="filter_order" class="form-label small">Ordem de Produção</label>
@@ -179,7 +179,7 @@
                                         placeholder="Número" value="{{ request.args.get('filter_order', '') }}">
                                 </div>
                             </div>
-                            
+
                             <!-- Nome da Célula -->
                             <div class="col-6">
                                 <label for="filter_cell" class="form-label small">Nome da Célula</label>
@@ -189,7 +189,7 @@
                                         placeholder="Célula" value="{{ request.args.get('filter_cell', '') }}">
                                 </div>
                             </div>
-                            
+
                             <!-- Botões -->
                             <div class="col-12 d-flex justify-content-between mt-3">
                                 <button type="submit" class="btn btn-primary btn-sm">
@@ -219,8 +219,8 @@
                 {% endfor %}
                 {% set audited_all = audited_all + cell_audited %}
             {% endfor %}
-            
-            
+
+
 
             <div class="accordion mb-3" id="cellsAccordion">
                 {% for cell_name, setups in cells.items() %}
@@ -228,7 +228,7 @@
                     {% set audited_count = setups|selectattr('audited', 'eq', true)|list|length %}
                     {% set pending_count = total_setups - audited_count %}
                     {% set progress_percent = 0 if total_setups == 0 else (audited_count / total_setups) * 100 %}
-                    
+
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="heading{{ loop.index }}">
                             <button class="accordion-button py-2 {% if loop.index > 1 %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="{{ 'true' if loop.index == 1 else 'false' }}" aria-controls="collapse{{ loop.index }}">
@@ -258,7 +258,7 @@
                                         </div>
                                         <span class="ms-2">{{ progress_percent|int }}%</span>
                                     </div>
-                                    
+
                                     <!-- Cards móveis para cada setup -->
                                     <div class="row g-2">
                                         {% for setup in setups %}
@@ -296,7 +296,7 @@
                                                                 {% endif %}
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div class="row mb-2 g-2">
                                                             <div class="col-6">
                                                                 <div class="small text-muted">Abastecedor</div>
@@ -315,12 +315,12 @@
                                                                 {% endif %}
                                                             </div>
                                                         </div>
-                                                        
+
                                                         <div class="d-flex justify-content-between mt-3">
                                                             <button type="button" class="btn btn-sm btn-info view-details-btn">
                                                                 <i class="fa fa-eye me-1"></i> Detalhes
                                                             </button>
-                                                            
+
                                                             <div class="btn-group btn-group-sm">
                                                                 {% if not setup.audited %}
                                                                 <button type="button" class="btn btn-success mark-audited-btn" 
@@ -333,7 +333,7 @@
                                                                     <i class="fa fa-undo"></i>
                                                                 </button>
                                                                 {% endif %}
-                                                                
+
                                                                 <button type="button" class="btn btn-danger delete-setup-btn" 
                                                                     title="Excluir Setup">
                                                                     <i class="fa fa-trash"></i>
@@ -364,7 +364,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    
+
     <!-- Modal de Confirmação de Exclusão -->
     <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -399,7 +399,7 @@
             event.preventDefault();
             // Substituir quebras de linha HTML por quebras de linha JS
             const formattedNotes = notes.replace(/\\n/g, '<br>');
-            
+
             // Criar um modal dinamicamente para exibir as anotações
             const modal = `
                 <div class="modal fade" id="viewNotesModal" tabindex="-1" aria-hidden="true">
@@ -421,16 +421,16 @@
                     </div>
                 </div>
             `;
-            
+
             // Remover modal anterior se existir
             const existingModal = document.getElementById('viewNotesModal');
             if (existingModal) {
                 existingModal.remove();
             }
-            
+
             // Adicionar o novo modal ao body
             document.body.insertAdjacentHTML('beforeend', modal);
-            
+
             // Exibir o modal
             const modalInstance = new bootstrap.Modal(document.getElementById('viewNotesModal'));
             modalInstance.show();
@@ -594,13 +594,13 @@
                 audit_timestamp: setupCard.getAttribute('data-audit-timestamp'),
                 verificationCheck: setupCard.getAttribute('data-verification-check') === 'true'
             };
-            
+
             // Dados específicos para abastecimento
             if (setupData.setupType === 'supply') {
                 setupData.productCode = setupCard.getAttribute('data-product-code');
                 setupData.productName = setupCard.getAttribute('data-product-name');
                 setupData.productPO = setupCard.getAttribute('data-product-po');
-                
+
                 // Obter itens selecionados do produto
                 const selectedItemsAttr = setupCard.getAttribute('data-selected-items');
                 try {
@@ -611,12 +611,12 @@
                     setupData.selectedItems = [];
                 }
             }
-            
+
             // Atualizar título do modal
             const setupType = setupData.setupType === 'removal' ? 'Retirada' : 'Abastecimento';
             document.getElementById('setupDetailsModalLabel').textContent = 
                 `${setupType} - Ordem ${setupData.orderNumber}`;
-            
+
             // Estruturar o conteúdo HTML para o modal
             let detailsHTML = `
                 <div class="setup-details">
@@ -662,7 +662,7 @@
                                 </ul>
                             </div>
                         </div>
-                        
+
                         <div class="card bg-dark border-secondary mb-3">
                             <div class="card-header py-2">
                                 <h6 class="mb-0">Status de Auditoria</h6>
@@ -690,7 +690,7 @@
                             </div>
                         </div>
             `;
-            
+
             // Seção específica para abastecimento (produtos)
             if (setupData.setupType === 'supply') {
                 detailsHTML += `
@@ -715,7 +715,7 @@
                                 </ul>
                             </div>
                         </div>
-                        
+
                         <!-- Seção de Itens do Produto -->
                         <div class="card bg-dark border-secondary mb-3">
                             <div class="card-header py-2">
@@ -752,11 +752,11 @@
                         </div>
                 `;
             }
-            
+
             // Adicionar seções para observações e anotações
             detailsHTML += `
                     </div>
-                    
+
                     <div class="row">
                         <div class="col-12 mb-3">
                             <div class="card bg-dark border-secondary h-100">
@@ -770,7 +770,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="col-12 mb-3">
                             <div class="card bg-dark border-secondary h-100">
                                 <div class="card-header py-2">
@@ -784,7 +784,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="photos-section">
                         <div class="card bg-dark border-secondary">
                             <div class="card-header py-2">
@@ -802,17 +802,17 @@
                     </div>
                 </div>
             `;
-            
+
             // Atualizar o conteúdo do modal
             document.getElementById('setupDetailsContent').innerHTML = detailsHTML;
-            
+
             // Exibir o modal
             const detailsModal = new bootstrap.Modal(document.getElementById('setupDetailsModal'));
             detailsModal.show();
-            
+
             // Carregar imagens do setup
             console.log('Iniciando carregamento de imagens para:', setupData.cellName, setupData.orderNumber, setupData.setupType);
-            
+
             fetch(`/get_setup_images/${setupData.cellName}/${setupData.orderNumber}/${setupData.setupType}`)
             .then(response => {
                 console.log('Resposta recebida:', response.status);
@@ -820,14 +820,14 @@
             })
             .then(data => {
                 console.log('Dados recebidos da API de imagens:', data);
-                
+
                 if (data.success && data.images && data.images.length > 0) {
                     // Criar carrossel para as imagens
                     let carouselHTML = `
                         <div id="setupPhotosCarousel" class="carousel slide" data-bs-ride="carousel">
                             <div class="carousel-indicators">
                     `;
-                    
+
                     // Adicionar indicadores
                     data.images.forEach((image, index) => {
                         carouselHTML += `
@@ -838,12 +838,12 @@
                                     aria-label="Foto ${index + 1}"></button>
                         `;
                     });
-                    
+
                     carouselHTML += `
                             </div>
                             <div class="carousel-inner">
                     `;
-                    
+
                     // Adicionar as imagens
                     data.images.forEach((image, index) => {
                         carouselHTML += `
@@ -852,7 +852,7 @@
                             </div>
                         `;
                     });
-                    
+
                     // Adicionar controles
                     carouselHTML += `
                             </div>
@@ -866,7 +866,7 @@
                             </button>
                         </div>
                     `;
-                    
+
                     // Atualizar o container de imagens
                     document.getElementById('setupImagesCarousel').innerHTML = carouselHTML;
                 } else {
@@ -901,23 +901,23 @@
             if (auditNotesForm) {
                 auditNotesForm.addEventListener('submit', function(e) {
                     e.preventDefault();
-                    
+
                     // Verificar confirmação de presença
                     const confirmPresence = document.getElementById('confirmPresence');
                     if (!confirmPresence.checked) {
                         confirmPresence.classList.add('is-invalid');
                         return;
                     }
-                    
+
                     // Obter dados do formulário
                     const auditNotes = document.getElementById('auditNotes').value;
                     const cellName = auditNotesForm.getAttribute('data-cell-name');
                     const orderNumber = auditNotesForm.getAttribute('data-order-number');
                     const setupType = auditNotesForm.getAttribute('data-setup-type');
-                    
+
                     // Marcar como auditado com as anotações
                     markAsAudited(cellName, orderNumber, setupType, 'true', auditNotes);
-                    
+
                     // Fechar o modal
                     const auditNotesModal = bootstrap.Modal.getInstance(document.getElementById('auditNotesModal'));
                     auditNotesModal.hide();
@@ -932,17 +932,17 @@
                     const cellName = card.getAttribute('data-cell-name');
                     const orderNumber = card.getAttribute('data-order-number');
                     const setupType = card.getAttribute('data-setup-type');
-                    
+
                     // Configurar o modal de notas
                     const auditNotesForm = document.getElementById('auditNotesForm');
                     auditNotesForm.setAttribute('data-cell-name', cellName);
                     auditNotesForm.setAttribute('data-order-number', orderNumber);
                     auditNotesForm.setAttribute('data-setup-type', setupType);
-                    
+
                     // Redefinir o formulário
                     document.getElementById('auditNotes').value = '';
                     document.getElementById('confirmPresence').checked = false;
-                    
+
                     // Exibir o modal
                     const auditNotesModal = new bootstrap.Modal(document.getElementById('auditNotesModal'));
                     auditNotesModal.show();
@@ -958,7 +958,7 @@
                         const cellName = card.getAttribute('data-cell-name');
                         const orderNumber = card.getAttribute('data-order-number');
                         const setupType = card.getAttribute('data-setup-type');
-                        
+
                         // Remover marcação de auditado
                         markAsAudited(cellName, orderNumber, setupType, 'false');
                     }
@@ -973,24 +973,24 @@
                     const cellName = card.getAttribute('data-cell-name');
                     const orderNumber = card.getAttribute('data-order-number');
                     const setupType = card.getAttribute('data-setup-type');
-                    
+
                     // Atualizar o modal de confirmação
                     document.getElementById('deleteModalCell').textContent = cellName;
                     document.getElementById('deleteModalOrder').textContent = orderNumber;
                     document.getElementById('deleteModalType').textContent = 
                         setupType === 'removal' ? 'Retirada' : 'Abastecimento';
-                    
+
                     // Configurar botão de confirmação
                     const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
                     confirmDeleteBtn.onclick = function() {
                         // Fechar o modal
                         const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
                         deleteModal.hide();
-                        
+
                         // Excluir o registro
                         deleteSetup(cellName, orderNumber, setupType);
                     };
-                    
+
                     // Exibir o modal
                     const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
                     deleteModal.show();
@@ -1013,126 +1013,126 @@
         body {
             font-size: 14px;
         }
-        
+
         .main-container {
             max-width: 100%;
             padding-top: 1rem;
             padding-bottom: 1rem;
         }
-        
+
         /* Cabeçalho mais compacto */
         .app-header {
             margin-bottom: 1rem;
         }
-        
+
         .app-title {
             font-size: 1.5rem;
             margin-bottom: 0.25rem;
         }
-        
+
         .app-subtitle {
             font-size: 0.9rem;
             margin-bottom: 0.5rem;
         }
-        
+
         /* Estilo para os cards de setup */
         .setup-card {
             transition: all 0.2s ease;
             border-width: 2px;
             border-left-width: 5px;
         }
-        
+
         .setup-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
-        
+
         /* Estilo para os badges */
         .badge {
             font-size: 0.75rem;
             padding: 0.25em 0.5em;
             font-weight: normal;
         }
-        
+
         /* Reduzir espaçamentos para aproveitar espaço em telas pequenas */
         .card-body {
             padding: 0.75rem;
         }
-        
+
         .list-group-item {
             padding: 0.5rem 0.75rem;
         }
-        
+
         /* Contraste para lista em dark mode */
         .list-group-item {
             border-color: #444;
         }
-        
+
         /* Ajuste para cabeçalhos de seção em mobile */
         .card-header h6 {
             font-size: 0.9rem;
             margin-bottom: 0;
         }
-        
+
         /* Estilos para o acordeão de células */
         .accordion-button {
             padding: 0.5rem 1rem;
             font-size: 0.9rem;
         }
-        
+
         .accordion-button::after {
             width: 0.8rem;
             height: 0.8rem;
             background-size: 0.8rem;
         }
-        
+
         /* Badge groups para economizar espaço */
         .badge-group .badge {
             font-size: 0.7rem;
             padding: 0.2em 0.4em;
             margin-right: 2px;
         }
-        
+
         /* Barra de progresso mais visível */
         .progress {
             height: 6px;
             background-color: #333;
         }
-        
+
         /* Ajuste para a exibição de imagens */
         .carousel-item img {
             max-height: 250px;
             object-fit: contain;
         }
-        
+
         /* Indicadores do carrossel menores */
         .carousel-indicators {
             margin-bottom: 0.25rem;
         }
-        
+
         .carousel-indicators [data-bs-target] {
             width: 6px;
             height: 6px;
             border-radius: 50%;
             margin: 0 3px;
         }
-        
+
         /* Ajuste para botões em mobile */
         .btn-sm {
             padding: 0.25rem 0.5rem;
             font-size: 0.75rem;
         }
-        
+
         /* Melhor visualização do modal em telas pequenas */
         @media (max-width: 576px) {
             .modal-dialog {
                 margin: 0.5rem;
             }
-            
+
             .modal-header {
                 padding: 0.5rem 1rem;
             }
-            
+
             .modal-footer {
                 padding: 0.5rem;
             }
