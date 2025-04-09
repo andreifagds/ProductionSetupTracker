@@ -315,6 +315,7 @@
                                                     data-product-code="{{ setup.product_code|default('') }}"
                                                     data-product-name="{{ setup.product_name|default('') }}"
                                                     data-product-po="{{ setup.product_po|default('') }}"
+                                                    data-selected-items="{{ setup.selected_items|default([])|tojson|replace('"', '&quot;') }}"
                                                     {% endif %}
                                                 >
                                                     <div class="card-body p-2 p-md-3">
@@ -620,6 +621,15 @@
                 setupData.productCode = setupCard.getAttribute('data-product-code');
                 setupData.productName = setupCard.getAttribute('data-product-name');
                 setupData.productPO = setupCard.getAttribute('data-product-po');
+                
+                // Obter itens selecionados do produto
+                const selectedItemsAttr = setupCard.getAttribute('data-selected-items');
+                try {
+                    setupData.selectedItems = selectedItemsAttr ? JSON.parse(selectedItemsAttr) : [];
+                } catch (e) {
+                    console.error('Erro ao processar itens selecionados:', e);
+                    setupData.selectedItems = [];
+                }
             }
             
             // Atualizar título do modal
@@ -721,6 +731,41 @@
                                 </ul>
                             </div>
                         </div>
+                        
+                        <!-- Seção de Itens do Produto -->
+                        <div class="card bg-dark border-secondary mb-3">
+                            <div class="card-header py-2">
+                                <h6 class="mb-0">Itens do Produto</h6>
+                            </div>
+                            <div class="card-body p-0">
+                                ${setupData.selectedItems && setupData.selectedItems.length > 0 ? `
+                                <div class="table-responsive">
+                                    <table class="table table-dark table-sm mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Código</th>
+                                                <th>Nome</th>
+                                                <th>PO do Fornecedor</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${setupData.selectedItems.map(item => `
+                                            <tr>
+                                                <td>${item.code || ''}</td>
+                                                <td>${item.name || ''}</td>
+                                                <td>${item.supplierPO || 'Não informado'}</td>
+                                            </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                ` : `
+                                <div class="alert alert-info m-0 rounded-0">
+                                    <i class="fa fa-info-circle me-2"></i> Nenhum item selecionado para este produto.
+                                </div>
+                                `}
+                            </div>
+                        </div>
                 `;
             }
             
@@ -782,7 +827,7 @@
             detailsModal.show();
             
             // Carregar imagens do setup
-            fetch(`/api/get_setup_images/${setupData.cellName}/${setupData.orderNumber}/${setupData.setupType}`)
+            fetch(`/get_setup_images/${setupData.cellName}/${setupData.orderNumber}/${setupData.setupType}`)
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.images && data.images.length > 0) {
