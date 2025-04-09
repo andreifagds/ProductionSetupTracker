@@ -436,10 +436,11 @@
                         
                         <!-- Photo Upload -->
                         <div class="mb-3">
-                            <label for="editPhotoInput" class="form-label">Nova Foto (opcional)</label>
-                            <input type="file" class="form-control" id="editPhotoInput" accept="image/*">
+                            <label for="editPhotoInput" class="form-label">Novas Fotos (opcional)</label>
+                            <input type="file" class="form-control" id="editPhotoInput" accept="image/*" multiple>
+                            <small class="text-muted">Você pode selecionar múltiplas imagens ao mesmo tempo.</small>
                             <div class="invalid-feedback">
-                                Por favor, selecione uma foto válida.
+                                Por favor, selecione fotos válidas.
                             </div>
                             
                             <!-- Hidden input to store base64 image data -->
@@ -447,9 +448,33 @@
                             
                             <!-- Image preview -->
                             <div class="image-preview-container mt-3">
-                                <h6>Foto Atual:</h6>
-                                <img id="editImagePreview" class="img-fluid mb-3 border rounded" style="max-height: 200px; display: none;">
-                                <div id="noImageMessage" class="alert alert-warning">Sem foto disponível</div>
+                                <h6>Fotos do Setup:</h6>
+                                
+                                <!-- Carrossel de fotos -->
+                                <div id="editImagesCarousel" class="carousel slide" data-bs-ride="carousel">
+                                    <div class="carousel-inner" id="editCarouselInner">
+                                        <!-- As imagens serão inseridas aqui via JavaScript -->
+                                        <div class="carousel-item active" id="noPhotoItem">
+                                            <div class="d-flex justify-content-center">
+                                                <div id="noImageMessage" class="alert alert-warning">Sem fotos disponíveis</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Controles do carrossel serão adicionados quando houver mais de uma imagem -->
+                                    <button class="carousel-control-prev" type="button" data-bs-target="#editImagesCarousel" data-bs-slide="prev" style="display: none;">
+                                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                        <span class="visually-hidden">Anterior</span>
+                                    </button>
+                                    <button class="carousel-control-next" type="button" data-bs-target="#editImagesCarousel" data-bs-slide="next" style="display: none;">
+                                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                        <span class="visually-hidden">Próximo</span>
+                                    </button>
+                                </div>
+                                
+                                <!-- Contador de imagens -->
+                                <div id="editImageCounter" class="text-center mt-2 d-none">
+                                    <span class="badge bg-primary">0 imagens selecionadas</span>
+                                </div>
                             </div>
                         </div>
                         
@@ -550,35 +575,155 @@
             return `${parts[0]}T${parts[1].substring(0, 5)}`;
         }
         
-        // Conversor de imagem para base64
-        function handleImageUpload(event) {
-            const file = event.target.files[0];
-            if (!file) {
+        // Conversor de imagens para base64
+        async function handleImageUpload(event) {
+            const files = event.target.files;
+            if (!files || files.length === 0) {
                 return;
             }
             
-            // Verificar se é uma imagem
-            if (!file.type.match('image.*')) {
-                document.getElementById('editPhotoInput').classList.add('is-invalid');
-                return;
-            }
+            // Limpar o carrossel exceto pelo placeholder
+            const carouselInner = document.getElementById('editCarouselInner');
+            carouselInner.innerHTML = '';
             
-            // Limpar erro se existir
-            document.getElementById('editPhotoInput').classList.remove('is-invalid');
+            // Adicionar item de placeholder
+            const placeholderItem = document.createElement('div');
+            placeholderItem.className = 'carousel-item active';
+            placeholderItem.id = 'noPhotoItem';
+            placeholderItem.innerHTML = '<div class="d-flex justify-content-center"><div id="noImageMessage" class="alert alert-warning">Sem fotos disponíveis</div></div>';
+            carouselInner.appendChild(placeholderItem);
             
-            // Ler arquivo como base64
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                // Guardar dados da imagem
-                document.getElementById('editPhotoData').value = e.target.result;
+            // Esconder o placeholder
+            document.getElementById('noImageMessage').style.display = 'none';
+            
+            // Array para armazenar as imagens processadas
+            const processedImages = [];
+            let firstImage = true;
+            
+            // Processar cada arquivo
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
                 
-                // Mostrar preview
-                const imagePreview = document.getElementById('editImagePreview');
-                imagePreview.src = e.target.result;
-                imagePreview.style.display = 'block';
-                document.getElementById('noImageMessage').style.display = 'none';
-            };
-            reader.readAsDataURL(file);
+                // Verificar se é uma imagem
+                if (!file.type.match('image.*')) {
+                    document.getElementById('editPhotoInput').classList.add('is-invalid');
+                    continue;
+                }
+                
+                // Limpar erro se existir
+                document.getElementById('editPhotoInput').classList.remove('is-invalid');
+                
+                // Processar imagem e adicionar ao carrossel
+                try {
+                    const dataUrl = await readFileAsDataURL(file);
+                    const compressedDataUrl = await compressImage(dataUrl);
+                    processedImages.push(compressedDataUrl);
+                    
+                    // Remover o placeholder se for a primeira imagem
+                    if (firstImage) {
+                        carouselInner.innerHTML = '';
+                        firstImage = false;
+                    }
+                    
+                    // Adicionar ao carrossel
+                    const carouselItem = document.createElement('div');
+                    carouselItem.className = `carousel-item ${i === 0 ? 'active' : ''}`;
+                    carouselItem.innerHTML = `
+                        <div class="d-flex justify-content-center">
+                            <img src="${compressedDataUrl}" class="img-fluid mb-3 border rounded" style="max-height: 200px;">
+                        </div>
+                    `;
+                    carouselInner.appendChild(carouselItem);
+                } catch (error) {
+                    console.error('Erro ao processar imagem:', error);
+                }
+            }
+            
+            // Atualizar o contador de imagens
+            const imageCounter = document.getElementById('editImageCounter');
+            if (processedImages.length > 0) {
+                imageCounter.querySelector('span').textContent = `${processedImages.length} imagens selecionadas`;
+                imageCounter.classList.remove('d-none');
+            } else {
+                imageCounter.classList.add('d-none');
+                // Mostrar o placeholder novamente se não houver imagens
+                document.getElementById('noImageMessage').style.display = 'block';
+            }
+            
+            // Exibir controles do carrossel se tiver mais de uma imagem
+            const prevButton = document.querySelector('#editImagesCarousel .carousel-control-prev');
+            const nextButton = document.querySelector('#editImagesCarousel .carousel-control-next');
+            
+            if (processedImages.length > 1) {
+                prevButton.style.display = 'block';
+                nextButton.style.display = 'block';
+            } else {
+                prevButton.style.display = 'none';
+                nextButton.style.display = 'none';
+            }
+            
+            // Salvar imagens processadas no input oculto
+            document.getElementById('editPhotoData').value = JSON.stringify(processedImages);
+        }
+        
+        // Função auxiliar para ler arquivo como DataURL
+        function readFileAsDataURL(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    resolve(e.target.result);
+                };
+                reader.onerror = function(e) {
+                    reject(e);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // Função auxiliar para comprimir a imagem
+        function compressImage(dataUrl) {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = function() {
+                    // Criar canvas para redimensionamento
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800;
+                    const MAX_HEIGHT = 800;
+                    
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    // Calcular proporções
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    // Desenhar e comprimir
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Converter para JPEG com qualidade reduzida
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                    resolve(compressedDataUrl);
+                };
+                
+                img.onerror = function(e) {
+                    reject(e);
+                };
+                
+                img.src = dataUrl;
+            });
         }
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -617,17 +762,105 @@
                         document.getElementById('editTimestamp').value = formattedDate;
                     }
                     
-                    // Atualizar preview da imagem se existir
+                    // Atualizar preview das imagens se existirem
                     if (hasImage) {
-                        const imagePreview = document.getElementById('editImagePreview');
-                        const noImageMessage = document.getElementById('noImageMessage');
+                        // Limpar o carrossel
+                        const carouselInner = document.getElementById('editCarouselInner');
+                        carouselInner.innerHTML = '';
                         
-                        imagePreview.src = `/photos/${cellName}/${fileIdentifier}.jpg?t=${new Date().getTime()}`;
-                        imagePreview.style.display = 'block';
-                        noImageMessage.style.display = 'none';
+                        // Consultar imagens existentes na pasta do setup
+                        fetch(`/photos/${cellName}/${fileIdentifier}?t=${new Date().getTime()}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.images && data.images.length > 0) {
+                                    // Atualizar o contador de imagens
+                                    const imageCounter = document.getElementById('editImageCounter');
+                                    imageCounter.querySelector('span').textContent = `${data.images.length} imagens existentes`;
+                                    imageCounter.classList.remove('d-none');
+                                    
+                                    // Adicionar cada imagem ao carrossel
+                                    data.images.forEach((image, index) => {
+                                        const carouselItem = document.createElement('div');
+                                        carouselItem.className = `carousel-item ${index === 0 ? 'active' : ''}`;
+                                        carouselItem.innerHTML = `
+                                            <div class="d-flex justify-content-center">
+                                                <img src="/photos/${cellName}/${image.path}?t=${new Date().getTime()}" 
+                                                    class="img-fluid mb-3 border rounded" style="max-height: 200px;">
+                                            </div>
+                                        `;
+                                        carouselInner.appendChild(carouselItem);
+                                    });
+                                    
+                                    // Exibir controles do carrossel se tiver mais de uma imagem
+                                    const prevButton = document.querySelector('#editImagesCarousel .carousel-control-prev');
+                                    const nextButton = document.querySelector('#editImagesCarousel .carousel-control-next');
+                                    
+                                    if (data.images.length > 1) {
+                                        prevButton.style.display = 'block';
+                                        nextButton.style.display = 'block';
+                                    } else {
+                                        prevButton.style.display = 'none';
+                                        nextButton.style.display = 'none';
+                                    }
+                                } else {
+                                    // Se não encontrar imagens no formato novo, exibir a imagem no formato antigo
+                                    const carouselItem = document.createElement('div');
+                                    carouselItem.className = 'carousel-item active';
+                                    carouselItem.innerHTML = `
+                                        <div class="d-flex justify-content-center">
+                                            <img src="/photos/${cellName}/${fileIdentifier}.jpg?t=${new Date().getTime()}" 
+                                                class="img-fluid mb-3 border rounded" style="max-height: 200px;">
+                                        </div>
+                                    `;
+                                    carouselInner.appendChild(carouselItem);
+                                    
+                                    // Atualizar o contador de imagens
+                                    const imageCounter = document.getElementById('editImageCounter');
+                                    imageCounter.querySelector('span').textContent = '1 imagem existente';
+                                    imageCounter.classList.remove('d-none');
+                                    
+                                    // Esconder controles do carrossel
+                                    document.querySelector('#editImagesCarousel .carousel-control-prev').style.display = 'none';
+                                    document.querySelector('#editImagesCarousel .carousel-control-next').style.display = 'none';
+                                }
+                                
+                                // Esconder mensagem de sem fotos
+                                document.getElementById('noImageMessage').style.display = 'none';
+                            })
+                            .catch(error => {
+                                console.error('Erro ao carregar imagens:', error);
+                                // Em caso de erro, exibir apenas a imagem padrão
+                                const carouselItem = document.createElement('div');
+                                carouselItem.className = 'carousel-item active';
+                                carouselItem.innerHTML = `
+                                    <div class="d-flex justify-content-center">
+                                        <img src="/photos/${cellName}/${fileIdentifier}.jpg?t=${new Date().getTime()}" 
+                                            class="img-fluid mb-3 border rounded" style="max-height: 200px;">
+                                    </div>
+                                `;
+                                carouselInner.appendChild(carouselItem);
+                                
+                                // Esconder controles do carrossel
+                                document.querySelector('#editImagesCarousel .carousel-control-prev').style.display = 'none';
+                                document.querySelector('#editImagesCarousel .carousel-control-next').style.display = 'none';
+                            });
                     } else {
-                        document.getElementById('editImagePreview').style.display = 'none';
-                        document.getElementById('noImageMessage').style.display = 'block';
+                        // Limpar o carrossel e mostrar placeholder
+                        const carouselInner = document.getElementById('editCarouselInner');
+                        carouselInner.innerHTML = `
+                            <div class="carousel-item active">
+                                <div class="d-flex justify-content-center">
+                                    <div id="noImageMessage" class="alert alert-warning">Sem fotos disponíveis</div>
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Esconder controles do carrossel
+                        document.querySelector('#editImagesCarousel .carousel-control-prev').style.display = 'none';
+                        document.querySelector('#editImagesCarousel .carousel-control-next').style.display = 'none';
+                        
+                        // Esconder contador de imagens
+                        document.getElementById('editImageCounter').classList.add('d-none');
                     }
                     
                     // Atualizar o título do modal baseado no tipo de setup

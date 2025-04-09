@@ -1847,6 +1847,59 @@ def get_photo(cell_name, filepath):
         # Compatibilidade com formato antigo
         return send_from_directory(cell_dir, filepath)
 
+@app.route('/photos/<cell_name>/<order_number>_<setup_type>')
+def get_setup_images(cell_name, order_number, setup_type):
+    """API para obter as imagens de um setup específico.
+    
+    Args:
+        cell_name: Nome da célula
+        order_number: Número da ordem
+        setup_type: Tipo de setup (supply ou removal)
+        
+    Returns:
+        JSON com a lista de imagens disponíveis para o setup
+    """
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    setup_identifier = f"{order_number}_{setup_type}"
+    
+    # Primeiro, verificar se existe um subdiretório para este setup (novo formato)
+    setup_dir = os.path.join(cell_dir, setup_identifier)
+    
+    if os.path.isdir(setup_dir):
+        # Obtém a lista de arquivos de imagem no subdiretório
+        images = []
+        for filename in os.listdir(setup_dir):
+            if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+                images.append({
+                    "filename": filename,
+                    "path": os.path.join(setup_identifier, filename)
+                })
+                
+        # Ordenar imagens pelo nome (normalmente image_1.jpg, image_2.jpg, etc)
+        images.sort(key=lambda x: x["filename"])
+        
+        return jsonify({
+            "success": True,
+            "images": images
+        })
+    else:
+        # Se não encontrar um diretório, verificar se existe a imagem no formato antigo
+        old_format_path = os.path.join(cell_dir, f"{setup_identifier}.jpg")
+        if os.path.isfile(old_format_path):
+            return jsonify({
+                "success": True,
+                "images": [{
+                    "filename": f"{setup_identifier}.jpg",
+                    "path": f"{setup_identifier}.jpg"
+                }]
+            })
+        
+        # Se não encontrar nenhuma imagem
+        return jsonify({
+            "success": False,
+            "images": []
+        })
+
 def reset_cell_flow(cell_name, reason):
     """Reset the flow of a cell without deleting records.
     
