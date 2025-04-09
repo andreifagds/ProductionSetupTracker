@@ -226,6 +226,57 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Adicionar evento de submissão ao formulário para debug
+    if (setupForm) {
+        // Validação em tempo real do status do formulário
+        const statusElement = document.getElementById('setupFormStatus');
+        const formStatusTxt = document.getElementById('formStatusTxt');
+        const typeTxt = document.getElementById('typeTxt');
+        const btnStatusTxt = document.getElementById('btnStatusTxt');
+        
+        if (statusElement) {
+            // Mostrar o debug no modo de desenvolvimento
+            statusElement.classList.remove('d-none');
+            
+            // Atualizar status a cada 1s
+            setInterval(() => {
+                const currentType = setupType ? setupType.value : 'unknown';
+                const isValid = Object.values(formValidationState).every(v => v === true);
+                const btnStatus = finalizeButton ? (finalizeButton.disabled ? 'Desabilitado' : 'Habilitado') : 'N/A';
+                
+                formStatusTxt.textContent = isValid ? 'Válido' : 'Inválido';
+                typeTxt.textContent = currentType;
+                btnStatusTxt.textContent = btnStatus;
+                
+                // Atualizar classes de cores
+                if (isValid) {
+                    formStatusTxt.className = 'text-success';
+                } else {
+                    formStatusTxt.className = 'text-danger';
+                }
+                
+                // Imprimir detalhes no console
+                console.log("[SETUP-VALIDATION-DETAIL] Estado atual:", formValidationState);
+                console.log("[SETUP-VALIDATION-DETAIL] Tipo:", currentType);
+                console.log("[SETUP-VALIDATION-DETAIL] Botão:", btnStatus);
+            }, 1000);
+            
+            if (setupForm) {
+                setupForm.addEventListener('submit', function(e) {
+                    // Garantir que o formulário possa ser enviado e que o finalizeButton esteja habilitado
+                    const isFormValid = validateForm();
+                    
+                    if (!isFormValid) {
+                        e.preventDefault();
+                        console.error("[SETUP-VALIDATION] Formulário inválido, bloqueando envio", formValidationState);
+                    } else {
+                        console.log("[SETUP-VALIDATION] Formulário válido, enviando...");
+                    }
+                });
+            }
+        }
+    }
+    
     // Validar o formulário ao carregar a página
     setTimeout(validateForm, 500);
     
@@ -260,6 +311,16 @@ document.addEventListener('DOMContentLoaded', function() {
         // Função para verificar o estado atual da validação
         getValidationState: function() {
             return {...formValidationState};
+        },
+        
+        // Forçar habilitação do botão (para retirada)
+        enableFinalizeButton: function() {
+            console.log("[SETUP-VALIDATION] Forçando habilitação do botão de finalização");
+            if (finalizeButton) {
+                finalizeButton.disabled = false;
+                finalizeButton.classList.add('btn-success');
+                finalizeButton.classList.remove('btn-secondary');
+            }
         }
     };
 });

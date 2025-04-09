@@ -286,6 +286,13 @@
                                         <i class="fa fa-check me-2"></i> Finalizar Cadastro
                                     </button>
                                 </div>
+                                
+                                <!-- Log de status (apenas para debug) -->
+                                <div id="setupFormStatus" class="small text-muted mt-2 d-none">
+                                    <div class="mb-1">Status do Formulário: <span id="formStatusTxt">-</span></div>
+                                    <div class="mb-1">Tipo: <span id="typeTxt">-</span></div>
+                                    <div class="mb-1">Botão habilitado: <span id="btnStatusTxt">-</span></div>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -632,11 +639,22 @@
                     operatorLabel.textContent = 'Operador da Retirada';
                     verificationLabel.textContent = 'Confirmo que verifiquei e retirei todos os materiais necessários';
                     
-                    // Se temos um número de ordem já digitado, preencher o campo
+                    // Ocultar campos de produtos para retirada
+                    const supplyFields = document.querySelectorAll('.supply-fields');
+                    supplyFields.forEach(field => {
+                        field.style.display = 'none';
+                    });
                     
                     // Mostrar formulário e esconder seleção
                     setupTypeSelectionContainer.style.display = 'none';
                     setupFormContainer.style.display = 'block';
+                    
+                    // Forçar o tipo para "removal" também no backend
+                    const typeInput = document.getElementById('setupType');
+                    if (typeInput) typeInput.value = 'removal';
+                    
+                    // Disparar evento para atualizar validação
+                    typeInput.dispatchEvent(new Event('change'));
                 });
                 
                 setupTypeSupplyBtn.addEventListener('click', function() {
