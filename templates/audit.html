@@ -61,6 +61,24 @@
             </div>
         </div>
 
+        <!-- Modal para exibir detalhes do setup -->
+        <div class="modal fade" id="setupDetailsModal" tabindex="-1" aria-labelledby="setupDetailsModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content bg-dark text-light">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="setupDetailsModalLabel">Detalhes do Setup</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" id="setupDetailsContent">
+                        <!-- Conteúdo preenchido via JavaScript -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Flash Messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -190,205 +208,130 @@
                         {% if cells %}
                             <div class="accordion" id="cellsAccordion">
                                 {% for cell_name, setups in cells.items() %}
+                                    {% set total_setups = setups|length %}
+                                    {% set audited_count = setups|selectattr('audited', 'eq', true)|list|length %}
+                                    {% set pending_count = total_setups - audited_count %}
+                                    
                                     <div class="accordion-item">
                                         <h2 class="accordion-header" id="heading{{ loop.index }}">
                                             <button class="accordion-button {% if loop.index > 1 %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="{{ 'true' if loop.index == 1 else 'false' }}" aria-controls="collapse{{ loop.index }}">
                                                 <i class="fa fa-industry me-2"></i>
-                                                Célula: {{ cell_name }} ({{ setups|length }} registros)
+                                                Célula: {{ cell_name }} 
+                                                <span class="ms-2 badge bg-secondary">Total: {{ total_setups }}</span>
+                                                <span class="ms-1 badge bg-success">Auditados: {{ audited_count }}</span>
+                                                <span class="ms-1 badge bg-warning text-dark">Pendentes: {{ pending_count }}</span>
                                             </button>
                                         </h2>
                                         <div id="collapse{{ loop.index }}" class="accordion-collapse collapse {% if loop.index == 1 %}show{% endif %}" aria-labelledby="heading{{ loop.index }}" data-bs-parent="#cellsAccordion">
                                             <div class="accordion-body">
                                                 {% if setups %}
-                                                    {% for setup in setups %}
-                                                        <div class="audit-cell-section">
-                                                            <div class="row setup-item" data-cell-name="{{ cell_name }}" data-order-number="{{ setup.order_number }}" data-setup-type="{{ setup.setup_type }}">
-                                                                <div class="col-md-8">
-                                                                    <div class="d-flex justify-content-between align-items-start">
-                                                                        <h5>Ordem de Produção: {{ setup.order_number }}</h5>
-                                                                        <div class="audit-status">
-                                                                            {% if setup.audited %}
-                                                                                <span class="badge bg-success audit-badge">
-                                                                                    <i class="fa fa-check-circle me-1"></i> Auditado
-                                                                                </span>
-                                                                                {% if setup.audit_notes %}
-                                                                                    <a href="#" class="ms-2 text-info audit-notes-icon" 
-                                                                                       data-bs-toggle="tooltip" data-bs-placement="top" 
-                                                                                       title="Ver anotações do auditor"
-                                                                                       onclick="showAuditNotes(event, '{{ setup.audit_notes|replace('\n', ' ')|e }}')">
-                                                                                        <i class="fa fa-sticky-note"></i>
-                                                                                    </a>
-                                                                                {% endif %}
-                                                                            {% else %}
-                                                                                <span class="badge bg-warning text-dark audit-badge">
-                                                                                    <i class="fa fa-clock-o me-1"></i> Pendente
-                                                                                </span>
-                                                                            {% endif %}
-                                                                        </div>
+                                                    <div class="row mb-3">
+                                                        <div class="col-12">
+                                                            <div class="progress" style="height: 25px;">
+                                                                {% if total_setups > 0 %}
+                                                                    {% set progress_percent = (audited_count / total_setups) * 100 %}
+                                                                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ progress_percent }}%;" 
+                                                                        aria-valuenow="{{ progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                                                                        {{ audited_count }} / {{ total_setups }} ({{ progress_percent|int }}%)
                                                                     </div>
-                                                                    <div class="setup-details setup-info">
-                                                                        <!-- Tipo de setup -->
-                                                                        <p>
-                                                                            <strong>Tipo:</strong>
-                                                                            {% if setup.setup_type == 'removal' %}
-                                                                                <span class="badge bg-danger">
-                                                                                    <i class="fa fa-minus-circle me-1"></i> Retirada de Material
-                                                                                </span>
-                                                                            {% else %}
-                                                                                <span class="badge bg-success">
-                                                                                    <i class="fa fa-plus-circle me-1"></i> Abastecimento de Material
-                                                                                </span>
-                                                                            {% endif %}
-                                                                        </p>
-                                                                        <p><strong>Data/Hora:</strong> {{ setup.timestamp }}</p>
-                                                                        <p>
-                                                                            <strong>
-                                                                                {% if setup.setup_type == 'removal' %}
-                                                                                    Operador da Retirada:
-                                                                                {% else %}
-                                                                                    Abastecedor:
-                                                                                {% endif %}
-                                                                            </strong> 
-                                                                            {{ setup.supplier_name }}
-                                                                        </p>
-                                                                        <!-- Informação de verificação foi removida conforme solicitação -->
-                                                                        {% if setup.audited %}
-                                                                            <div class="audit-info">
-                                                                                <p><strong>Auditado por:</strong> {{ setup.auditor_name }}</p>
-                                                                                {% if setup.audit_timestamp %}
-                                                                                    <p><strong>Data da auditoria:</strong> {{ setup.audit_timestamp }}</p>
-                                                                                {% endif %}
-                                                                                <!-- Removido o acordeão para anotações do auditor, agora é exibido em popup pelo ícone no status -->
-                                                                            </div>
-                                                                        {% endif %}
-                                                                        <!-- Informações de produto (apenas para abastecimento) -->
-                                                                        {% if setup.setup_type == 'supply' and setup.product_code %}
-                                                                            <div class="product-info mb-2">
-                                                                                <p>
-                                                                                    <strong>Produto:</strong> 
-                                                                                    {{ setup.product_code }} - {{ setup.product_name }}
-                                                                                </p>
-                                                                                {% if setup.product_po %}
-                                                                                    <p>
-                                                                                        <strong>PO do Fornecedor (Produto):</strong> 
-                                                                                        {{ setup.product_po }}
-                                                                                    </p>
-                                                                                {% endif %}
-                                                                                
-                                                                                {% if setup.selected_items and setup.selected_items|length > 0 %}
-                                                                                    <div class="items-info mt-2">
-                                                                                        <p><strong>Itens do Produto:</strong></p>
-                                                                                        <ul class="list-group">
-                                                                                            {% for item in setup.selected_items %}
-                                                                                                <li class="list-group-item bg-dark">
-                                                                                                    <div>{{ item.code }} - {{ item.name }}</div>
-                                                                                                    {% if item.supplierPO %}
-                                                                                                        <small class="text-secondary">
-                                                                                                            PO do Fornecedor: {{ item.supplierPO }}
-                                                                                                        </small>
-                                                                                                    {% endif %}
-                                                                                                </li>
-                                                                                            {% endfor %}
-                                                                                        </ul>
-                                                                                    </div>
-                                                                                {% endif %}
-                                                                            </div>
-                                                                        {% endif %}
-                                                                        
-                                                                        {% if setup.observation %}
-                                                                            <p><strong>Observações do Abastecedor:</strong> {{ setup.observation }}</p>
-                                                                        {% endif %}
+                                                                {% else %}
+                                                                    <div class="progress-bar bg-secondary" role="progressbar" style="width: 100%">
+                                                                        Sem registros
                                                                     </div>
-                                                                </div>
-                                                                <div class="col-md-4 text-center">
-                                                                    {% if setup.has_image %}
-                                                                        <!-- Carrossel de imagens -->
-                                                                        <div id="carousel{{ cell_name }}{{ loop.index }}" class="carousel slide">
-                                                                            <div class="carousel-inner">
-                                                                                {% if setup.images %}
-                                                                                    {% for image in setup.images %}
-                                                                                        <div class="carousel-item {% if loop.first %}active{% endif %}">
-                                                                                            <img src="{{ url_for("get_photo", cell_name=cell_name, filepath=image.path) }}" 
-                                                                                                 class="setup-image img-fluid" alt="Foto {{ loop.index }} do Setup">
-                                                                                        </div>
-                                                                                    {% endfor %}
-                                                                                {% else %}
-                                                                                    <!-- Compatibilidade com formato antigo -->
-                                                                                    <div class="carousel-item active">
-                                                                                        <img src="{{ url_for("get_photo", cell_name=cell_name, filepath=setup.main_image) }}" 
-                                                                                             class="setup-image img-fluid" alt="Foto do Setup">
-                                                                                    </div>
-                                                                                {% endif %}
-                                                                            </div>
-                                                                            {% if setup.images|length > 1 %}
-                                                                                <button class="carousel-control-prev" type="button" data-bs-target="#carousel{{ cell_name }}{{ loop.index }}" data-bs-slide="prev">
-                                                                                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                                                                    <span class="visually-hidden">Anterior</span>
-                                                                                </button>
-                                                                                <button class="carousel-control-next" type="button" data-bs-target="#carousel{{ cell_name }}{{ loop.index }}" data-bs-slide="next">
-                                                                                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                                                                    <span class="visually-hidden">Próximo</span>
-                                                                                </button>
-                                                                                <div class="text-center mt-2">
-                                                                                    <span class="badge bg-secondary">{{ setup.images|length }} imagens</span>
-                                                                                </div>
-                                                                            {% endif %}
-                                                                        </div>
-                                                                    {% else %}
-                                                                        <div class="alert alert-warning">
-                                                                            Imagem não disponível
-                                                                        </div>
-                                                                    {% endif %}
-                                                                    
-                                                                        <button class="btn btn-sm btn-primary edit-setup-btn"
-                                                                                data-setup-id="{{ loop.index }}"
-                                                                                data-cell-name="{{ cell_name }}"
-                                                                                data-order-number="{{ setup.order_number }}"
-                                                                                data-supplier-name="{{ setup.supplier_name }}"
-                                                                                data-observation="{{ setup.observation }}"
-                                                                                data-verification-check="{{ setup.verification_check }}"
-                                                                                data-setup-type="{{ setup.setup_type }}">
-                                                                            <i class="fa fa-edit me-1"></i> Editar
-                                                                        </button>
-                                                                        
-                                                                        <button class="btn btn-sm btn-danger delete-setup-btn"
-                                                                                data-cell-name="{{ cell_name }}"
-                                                                                data-order-number="{{ setup.order_number }}"
-                                                                                data-setup-type="{{ setup.setup_type }}">
-                                                                            <i class="fa fa-trash me-1"></i> Excluir
-                                                                        </button>
-                                                                        
-                                                                        {% if not setup.audited %}
-                                                                            <button class="btn btn-sm btn-success mark-audited-btn"
-                                                                                    data-cell-name="{{ cell_name }}"
-                                                                                    data-order-number="{{ setup.order_number }}"
-                                                                                    data-supplier-name="{{ setup.supplier_name }}"
-                                                                                    data-observation="{{ setup.observation }}"
-                                                                                    data-verification-check="{{ setup.verification_check }}"
-                                                                                    data-setup-type="{{ setup.setup_type }}"
-                                                                                    data-action="mark">
-                                                                                <i class="fa fa-check-circle me-1"></i> Marcar como Auditado
-                                                                            </button>
-                                                                        {% else %}
-                                                                            <button class="btn btn-sm btn-warning mark-audited-btn"
-                                                                                    data-cell-name="{{ cell_name }}"
-                                                                                    data-order-number="{{ setup.order_number }}"
-                                                                                    data-supplier-name="{{ setup.supplier_name }}"
-                                                                                    data-observation="{{ setup.observation }}"
-                                                                                    data-verification-check="{{ setup.verification_check }}"
-                                                                                    data-setup-type="{{ setup.setup_type }}"
-                                                                                    data-action="unmark">
-                                                                                <i class="fa fa-undo me-1"></i> Desmarcar Auditoria
-                                                                            </button>
-                                                                        {% endif %}
-                                                                    </div>
-                                                                </div>
+                                                                {% endif %}
                                                             </div>
                                                         </div>
-                                                    {% endfor %}
+                                                    </div>
+                                                
+                                                    <div class="table-responsive">
+                                                        <table class="table table-hover">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Ordem</th>
+                                                                    <th>Tipo</th>
+                                                                    <th>Data/Hora</th>
+                                                                    <th>Abastecedor</th>
+                                                                    <th>Status</th>
+                                                                    <th>Ações</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {% for setup in setups %}
+                                                                <tr 
+                                                                    class="setup-row {% if setup.audited %}table-success{% endif %}"
+                                                                    data-cell-name="{{ cell_name }}"
+                                                                    data-order-number="{{ setup.order_number }}"
+                                                                    data-setup-type="{{ setup.setup_type }}"
+                                                                    data-timestamp="{{ setup.timestamp }}"
+                                                                    data-supplier-name="{{ setup.supplier_name }}"
+                                                                    data-observation="{{ setup.observation|default('') }}"
+                                                                    data-audited="{{ setup.audited|default(false)|string|lower }}"
+                                                                    data-auditor-name="{{ setup.auditor_name|default('') }}"
+                                                                    data-audit-notes="{{ setup.audit_notes|default('') }}"
+                                                                    data-verification-check="{{ setup.verification_check|default(false)|string|lower }}"
+                                                                    {% if setup.setup_type == 'supply' %}
+                                                                    data-product-code="{{ setup.product_code|default('') }}"
+                                                                    data-product-name="{{ setup.product_name|default('') }}"
+                                                                    data-product-po="{{ setup.product_po|default('') }}"
+                                                                    {% endif %}
+                                                                >
+                                                                    <td>{{ setup.order_number }}</td>
+                                                                    <td>
+                                                                        {% if setup.setup_type == 'removal' %}
+                                                                            <span class="badge bg-danger">Retirada</span>
+                                                                        {% else %}
+                                                                            <span class="badge bg-primary">Abastecimento</span>
+                                                                        {% endif %}
+                                                                    </td>
+                                                                    <td>{{ setup.timestamp }}</td>
+                                                                    <td>{{ setup.supplier_name }}</td>
+                                                                    <td>
+                                                                        {% if setup.audited %}
+                                                                            <span class="badge bg-success">
+                                                                                <i class="fa fa-check-circle me-1"></i> Auditado
+                                                                                {% if setup.audit_notes %}
+                                                                                <i class="fa fa-sticky-note ms-1" data-bs-toggle="tooltip" title="Possui anotações"></i>
+                                                                                {% endif %}
+                                                                            </span>
+                                                                        {% else %}
+                                                                            <span class="badge bg-warning text-dark">
+                                                                                <i class="fa fa-clock-o me-1"></i> Pendente
+                                                                            </span>
+                                                                        {% endif %}
+                                                                    </td>
+                                                                    <td>
+                                                                        <div class="btn-group btn-group-sm">
+                                                                            <button type="button" class="btn btn-info view-details-btn" 
+                                                                                data-bs-toggle="tooltip" title="Ver Detalhes">
+                                                                                <i class="fa fa-eye"></i>
+                                                                            </button>
+                                                                            
+                                                                            {% if not setup.audited %}
+                                                                            <button type="button" class="btn btn-success mark-audited-btn" 
+                                                                                data-bs-toggle="tooltip" title="Marcar como Auditado">
+                                                                                <i class="fa fa-check"></i>
+                                                                            </button>
+                                                                            {% else %}
+                                                                            <button type="button" class="btn btn-warning unmark-audited-btn" 
+                                                                                data-bs-toggle="tooltip" title="Remover Auditoria">
+                                                                                <i class="fa fa-undo"></i>
+                                                                            </button>
+                                                                            {% endif %}
+                                                                            
+                                                                            <button type="button" class="btn btn-danger delete-setup-btn" 
+                                                                                data-bs-toggle="tooltip" title="Excluir Setup">
+                                                                                <i class="fa fa-trash"></i>
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                                {% endfor %}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
                                                 {% else %}
                                                     <div class="alert alert-info">
-                                                        Nenhum setup cadastrado para esta célula.
+                                                        <i class="fa fa-info-circle me-2"></i> Nenhum setup cadastrado para esta célula.
                                                     </div>
                                                 {% endif %}
                                             </div>
@@ -398,106 +341,10 @@
                             </div>
                         {% else %}
                             <div class="alert alert-info">
-                                Nenhum setup cadastrado no sistema.
+                                <i class="fa fa-info-circle me-2"></i> Nenhum setup cadastrado no sistema.
                             </div>
                         {% endif %}
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Setup Modal -->
-    <div class="modal fade" id="editSetupModal" tabindex="-1" aria-labelledby="editSetupModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editSetupModalLabel">Editar Setup</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="editSetupForm">
-                        <!-- Hidden fields -->
-                        <input type="hidden" id="editCellName" name="cell_name">
-                        <input type="hidden" id="editOrderNumber" name="order_number">
-                        <input type="hidden" id="editSetupType" name="setup_type">
-                        
-                        <!-- Data e Hora do Registro -->
-                        <div class="mb-3">
-                            <label for="editTimestamp" class="form-label">Data e Hora do Registro</label>
-                            <input type="datetime-local" class="form-control" id="editTimestamp" name="timestamp">
-                        </div>
-                        
-                        <!-- Supplier Name -->
-                        <div class="mb-3">
-                            <label for="editSupplierName" class="form-label">Nome do Abastecedor</label>
-                            <input type="text" class="form-control" id="editSupplierName" name="supplier_name" required>
-                        </div>
-                        
-                        <!-- Photo Upload -->
-                        <div class="mb-3">
-                            <label for="editPhotoInput" class="form-label">Novas Fotos (opcional)</label>
-                            <input type="file" class="form-control" id="editPhotoInput" accept="image/*" multiple>
-                            <small class="text-muted">Você pode selecionar múltiplas imagens ao mesmo tempo.</small>
-                            <div class="invalid-feedback">
-                                Por favor, selecione fotos válidas.
-                            </div>
-                            
-                            <!-- Hidden input to store base64 image data -->
-                            <input type="hidden" id="editPhotoData" name="photo_data">
-                            
-                            <!-- Image preview -->
-                            <div class="image-preview-container mt-3">
-                                <h6>Fotos do Setup:</h6>
-                                
-                                <!-- Carrossel de fotos -->
-                                <div id="editImagesCarousel" class="carousel slide" data-bs-ride="carousel">
-                                    <div class="carousel-inner" id="editCarouselInner">
-                                        <!-- As imagens serão inseridas aqui via JavaScript -->
-                                        <div class="carousel-item active" id="noPhotoItem">
-                                            <div class="d-flex justify-content-center">
-                                                <div id="noImageMessage" class="alert alert-warning">Sem fotos disponíveis</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- Controles do carrossel serão adicionados quando houver mais de uma imagem -->
-                                    <button class="carousel-control-prev" type="button" data-bs-target="#editImagesCarousel" data-bs-slide="prev" style="display: none;">
-                                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                        <span class="visually-hidden">Anterior</span>
-                                    </button>
-                                    <button class="carousel-control-next" type="button" data-bs-target="#editImagesCarousel" data-bs-slide="next" style="display: none;">
-                                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                        <span class="visually-hidden">Próximo</span>
-                                    </button>
-                                </div>
-                                
-                                <!-- Contador de imagens -->
-                                <div id="editImageCounter" class="text-center mt-2 d-none">
-                                    <span class="badge bg-primary">0 imagens selecionadas</span>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Observation -->
-                        <div class="mb-3">
-                            <label for="editObservation" class="form-label">Observações do Abastecedor (opcional)</label>
-                            <textarea class="form-control" id="editObservation" name="observation" rows="3"></textarea>
-                        </div>
-                        
-                        <!-- Verification Checkbox -->
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="editVerificationCheck" name="verification_check" value="true">
-                                <label class="form-check-label" for="editVerificationCheck">
-                                    Confirmo que verifiquei o abastecimento e a remoção de itens do produto anterior
-                                </label>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" id="saveSetupBtn">Salvar Alterações</button>
                 </div>
             </div>
         </div>
@@ -510,40 +357,25 @@
     <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content bg-dark text-light">
-                <div class="modal-header bg-danger">
-                    <h5 class="modal-title" id="deleteConfirmModalLabel">Confirmação de Exclusão</h5>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="deleteConfirmModalLabel">Confirmar Exclusão</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Tem certeza que deseja excluir este registro?</p>
-                    <p><strong>Esta ação não pode ser desfeita.</strong></p>
-                    
-                    <div class="alert alert-danger">
-                        <i class="fa fa-warning me-2"></i> 
-                        Todos os dados associados a este registro, incluindo dados do setup e imagens serão permanentemente removidos.
-                    </div>
+                    <p>Você tem certeza que deseja excluir este registro de setup?</p>
+                    <p class="text-danger">
+                        <i class="fa fa-exclamation-triangle me-2"></i>
+                        <strong>Atenção:</strong> Esta ação não pode ser desfeita.
+                    </p>
+                    <p class="mb-0"><strong>Célula:</strong> <span id="deleteModalCell"></span></p>
+                    <p class="mb-0"><strong>Ordem:</strong> <span id="deleteModalOrder"></span></p>
+                    <p class="mb-0"><strong>Tipo:</strong> <span id="deleteModalType"></span></p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Confirmar Exclusão</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal para exibir as anotações do auditor (somente visualização) -->
-    <div class="modal fade" id="viewAuditNotesModal" tabindex="-1" aria-labelledby="viewAuditNotesModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content bg-dark text-light">
-                <div class="modal-header bg-info text-dark">
-                    <h5 class="modal-title" id="viewAuditNotesModalLabel">Anotações do Auditor</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="viewAuditNotesContent"></div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                        <i class="fa fa-trash me-2"></i> Excluir
+                    </button>
                 </div>
             </div>
         </div>
@@ -555,805 +387,572 @@
             event.preventDefault();
             // Substituir quebras de linha HTML por quebras de linha JS
             const formattedNotes = notes.replace(/\\n/g, '<br>');
-            document.getElementById('viewAuditNotesContent').innerHTML = formattedNotes;
             
-            // Abrir o modal
-            const viewAuditNotesModal = new bootstrap.Modal(document.getElementById('viewAuditNotesModal'));
-            viewAuditNotesModal.show();
-        }
-
-        // Função para formatar data para campo datetime-local
-        function formatDateForInput(dateStr) {
-            // Formato esperado: YYYY-MM-DD HH:MM:SS
-            if (!dateStr) return '';
-            
-            // Separar data e hora
-            const parts = dateStr.split(' ');
-            if (parts.length !== 2) return '';
-            
-            // Formatar como YYYY-MM-DDThh:mm
-            return `${parts[0]}T${parts[1].substring(0, 5)}`;
-        }
-        
-        // Conversor de imagens para base64
-        async function handleImageUpload(event) {
-            const files = event.target.files;
-            if (!files || files.length === 0) {
-                return;
-            }
-            
-            // Limpar o carrossel exceto pelo placeholder
-            const carouselInner = document.getElementById('editCarouselInner');
-            carouselInner.innerHTML = '';
-            
-            // Adicionar item de placeholder
-            const placeholderItem = document.createElement('div');
-            placeholderItem.className = 'carousel-item active';
-            placeholderItem.id = 'noPhotoItem';
-            placeholderItem.innerHTML = '<div class="d-flex justify-content-center"><div id="noImageMessage" class="alert alert-warning">Sem fotos disponíveis</div></div>';
-            carouselInner.appendChild(placeholderItem);
-            
-            // Esconder o placeholder
-            document.getElementById('noImageMessage').style.display = 'none';
-            
-            // Array para armazenar as imagens processadas
-            const processedImages = [];
-            let firstImage = true;
-            
-            // Processar cada arquivo
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                
-                // Verificar se é uma imagem
-                if (!file.type.match('image.*')) {
-                    document.getElementById('editPhotoInput').classList.add('is-invalid');
-                    continue;
-                }
-                
-                // Limpar erro se existir
-                document.getElementById('editPhotoInput').classList.remove('is-invalid');
-                
-                // Processar imagem e adicionar ao carrossel
-                try {
-                    const dataUrl = await readFileAsDataURL(file);
-                    const compressedDataUrl = await compressImage(dataUrl);
-                    processedImages.push(compressedDataUrl);
-                    
-                    // Remover o placeholder se for a primeira imagem
-                    if (firstImage) {
-                        carouselInner.innerHTML = '';
-                        firstImage = false;
-                    }
-                    
-                    // Adicionar ao carrossel
-                    const carouselItem = document.createElement('div');
-                    carouselItem.className = `carousel-item ${i === 0 ? 'active' : ''}`;
-                    carouselItem.innerHTML = `
-                        <div class="d-flex justify-content-center">
-                            <img src="${compressedDataUrl}" class="img-fluid mb-3 border rounded" style="max-height: 200px;">
-                        </div>
-                    `;
-                    carouselInner.appendChild(carouselItem);
-                } catch (error) {
-                    console.error('Erro ao processar imagem:', error);
-                }
-            }
-            
-            // Atualizar o contador de imagens
-            const imageCounter = document.getElementById('editImageCounter');
-            if (processedImages.length > 0) {
-                imageCounter.querySelector('span').textContent = `${processedImages.length} imagens selecionadas`;
-                imageCounter.classList.remove('d-none');
-            } else {
-                imageCounter.classList.add('d-none');
-                // Mostrar o placeholder novamente se não houver imagens
-                document.getElementById('noImageMessage').style.display = 'block';
-            }
-            
-            // Exibir controles do carrossel se tiver mais de uma imagem
-            const prevButton = document.querySelector('#editImagesCarousel .carousel-control-prev');
-            const nextButton = document.querySelector('#editImagesCarousel .carousel-control-next');
-            
-            if (processedImages.length > 1) {
-                prevButton.style.display = 'block';
-                nextButton.style.display = 'block';
-            } else {
-                prevButton.style.display = 'none';
-                nextButton.style.display = 'none';
-            }
-            
-            // Salvar imagens processadas no input oculto
-            document.getElementById('editPhotoData').value = JSON.stringify(processedImages);
-        }
-        
-        // Função auxiliar para ler arquivo como DataURL
-        function readFileAsDataURL(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    resolve(e.target.result);
-                };
-                reader.onerror = function(e) {
-                    reject(e);
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-        
-        // Função auxiliar para comprimir a imagem
-        function compressImage(dataUrl) {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = function() {
-                    // Criar canvas para redimensionamento
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 800;
-                    const MAX_HEIGHT = 800;
-                    
-                    let width = img.width;
-                    let height = img.height;
-                    
-                    // Calcular proporções
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                        }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
-                        }
-                    }
-                    
-                    canvas.width = width;
-                    canvas.height = height;
-                    
-                    // Desenhar e comprimir
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    // Converter para JPEG com qualidade reduzida
-                    const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                    resolve(compressedDataUrl);
-                };
-                
-                img.onerror = function(e) {
-                    reject(e);
-                };
-                
-                img.src = dataUrl;
-            });
-        }
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            // Adicionar evento ao input de foto
-            document.getElementById('editPhotoInput').addEventListener('change', handleImageUpload);
-        
-            // Adicionar evento para editar setup
-            const editSetupBtns = document.querySelectorAll('.edit-setup-btn');
-            editSetupBtns.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const cellName = this.getAttribute('data-cell-name');
-                    const orderNumber = this.getAttribute('data-order-number');
-                    const supplierName = this.getAttribute('data-supplier-name') || '';
-                    const observation = this.getAttribute('data-observation') || '';
-                    const verificationCheck = this.getAttribute('data-verification-check') === 'True';
-                    const setupType = this.getAttribute('data-setup-type') || 'supply';
-                    const timestamp = this.getAttribute('data-timestamp') || '';
-                    const hasImage = this.getAttribute('data-has-image') === 'True';
-                    const fileIdentifier = `${orderNumber}_${setupType}`;
-                    
-                    // Atualizar o modal com os dados
-                    document.getElementById('editCellName').value = cellName;
-                    document.getElementById('editOrderNumber').value = orderNumber;
-                    document.getElementById('editSupplierName').value = supplierName || '';
-                    document.getElementById('editObservation').value = observation;
-                    document.getElementById('editVerificationCheck').checked = verificationCheck;
-                    document.getElementById('editSetupType').value = setupType;
-                    
-                    // Resetar campo de foto e preview
-                    document.getElementById('editPhotoData').value = '';
-                    document.getElementById('editPhotoInput').value = '';
-                    
-                    // Converter a data/hora para o formato datetime-local
-                    if (timestamp) {
-                        const formattedDate = formatDateForInput(timestamp);
-                        document.getElementById('editTimestamp').value = formattedDate;
-                    }
-                    
-                    // Atualizar preview das imagens se existirem
-                    if (hasImage) {
-                        // Limpar o carrossel
-                        const carouselInner = document.getElementById('editCarouselInner');
-                        carouselInner.innerHTML = '';
-                        
-                        // Consultar imagens existentes na pasta do setup
-                        fetch(`/photos/${cellName}/${fileIdentifier}?t=${new Date().getTime()}`)
-                            .then(response => response.json())
-                            .then(data => {
-                                if (data.images && data.images.length > 0) {
-                                    // Atualizar o contador de imagens
-                                    const imageCounter = document.getElementById('editImageCounter');
-                                    imageCounter.querySelector('span').textContent = `${data.images.length} imagens existentes`;
-                                    imageCounter.classList.remove('d-none');
-                                    
-                                    // Adicionar cada imagem ao carrossel
-                                    data.images.forEach((image, index) => {
-                                        const carouselItem = document.createElement('div');
-                                        carouselItem.className = `carousel-item ${index === 0 ? 'active' : ''}`;
-                                        carouselItem.innerHTML = `
-                                            <div class="d-flex justify-content-center">
-                                                <img src="/photos/${cellName}/${image.path}?t=${new Date().getTime()}" 
-                                                    class="img-fluid mb-3 border rounded" style="max-height: 200px;">
-                                            </div>
-                                        `;
-                                        carouselInner.appendChild(carouselItem);
-                                    });
-                                    
-                                    // Exibir controles do carrossel se tiver mais de uma imagem
-                                    const prevButton = document.querySelector('#editImagesCarousel .carousel-control-prev');
-                                    const nextButton = document.querySelector('#editImagesCarousel .carousel-control-next');
-                                    
-                                    if (data.images.length > 1) {
-                                        prevButton.style.display = 'block';
-                                        nextButton.style.display = 'block';
-                                    } else {
-                                        prevButton.style.display = 'none';
-                                        nextButton.style.display = 'none';
-                                    }
-                                } else {
-                                    // Se não encontrar imagens no formato novo, exibir a imagem no formato antigo
-                                    const carouselItem = document.createElement('div');
-                                    carouselItem.className = 'carousel-item active';
-                                    carouselItem.innerHTML = `
-                                        <div class="d-flex justify-content-center">
-                                            <img src="/photos/${cellName}/${fileIdentifier}.jpg?t=${new Date().getTime()}" 
-                                                class="img-fluid mb-3 border rounded" style="max-height: 200px;">
-                                        </div>
-                                    `;
-                                    carouselInner.appendChild(carouselItem);
-                                    
-                                    // Atualizar o contador de imagens
-                                    const imageCounter = document.getElementById('editImageCounter');
-                                    imageCounter.querySelector('span').textContent = '1 imagem existente';
-                                    imageCounter.classList.remove('d-none');
-                                    
-                                    // Esconder controles do carrossel
-                                    document.querySelector('#editImagesCarousel .carousel-control-prev').style.display = 'none';
-                                    document.querySelector('#editImagesCarousel .carousel-control-next').style.display = 'none';
-                                }
-                                
-                                // Esconder mensagem de sem fotos
-                                document.getElementById('noImageMessage').style.display = 'none';
-                            })
-                            .catch(error => {
-                                console.error('Erro ao carregar imagens:', error);
-                                // Em caso de erro, exibir apenas a imagem padrão
-                                const carouselItem = document.createElement('div');
-                                carouselItem.className = 'carousel-item active';
-                                carouselItem.innerHTML = `
-                                    <div class="d-flex justify-content-center">
-                                        <img src="/photos/${cellName}/${fileIdentifier}.jpg?t=${new Date().getTime()}" 
-                                            class="img-fluid mb-3 border rounded" style="max-height: 200px;">
-                                    </div>
-                                `;
-                                carouselInner.appendChild(carouselItem);
-                                
-                                // Esconder controles do carrossel
-                                document.querySelector('#editImagesCarousel .carousel-control-prev').style.display = 'none';
-                                document.querySelector('#editImagesCarousel .carousel-control-next').style.display = 'none';
-                            });
-                    } else {
-                        // Limpar o carrossel e mostrar placeholder
-                        const carouselInner = document.getElementById('editCarouselInner');
-                        carouselInner.innerHTML = `
-                            <div class="carousel-item active">
-                                <div class="d-flex justify-content-center">
-                                    <div id="noImageMessage" class="alert alert-warning">Sem fotos disponíveis</div>
+            // Criar um modal dinamicamente para exibir as anotações
+            const modal = `
+                <div class="modal fade" id="viewNotesModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content bg-dark text-light">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Anotações do Auditor</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="p-3 bg-light text-dark rounded">
+                                    ${formattedNotes}
                                 </div>
                             </div>
-                        `;
-                        
-                        // Esconder controles do carrossel
-                        document.querySelector('#editImagesCarousel .carousel-control-prev').style.display = 'none';
-                        document.querySelector('#editImagesCarousel .carousel-control-next').style.display = 'none';
-                        
-                        // Esconder contador de imagens
-                        document.getElementById('editImageCounter').classList.add('d-none');
-                    }
-                    
-                    // Atualizar o título do modal baseado no tipo de setup
-                    const modalTitle = document.getElementById('editSetupModalLabel');
-                    if (setupType === 'removal') {
-                        modalTitle.textContent = 'Editar Retirada de Material';
-                        document.querySelector('label[for="editSupplierName"]').textContent = 'Nome do Operador da Retirada';
-                    } else {
-                        modalTitle.textContent = 'Editar Abastecimento de Material';
-                        document.querySelector('label[for="editSupplierName"]').textContent = 'Nome do Abastecedor';
-                    }
-                    
-                    // Abrir o modal
-                    const modal = new bootstrap.Modal(document.getElementById('editSetupModal'));
-                    modal.show();
-                });
-            });
-            
-            // Botão para salvar alterações
-            document.getElementById('saveSetupBtn').addEventListener('click', function() {
-                const cellName = document.getElementById('editCellName').value;
-                const orderNumber = document.getElementById('editOrderNumber').value;
-                const supplierName = document.getElementById('editSupplierName').value;
-                const observation = document.getElementById('editObservation').value;
-                const verificationCheck = document.getElementById('editVerificationCheck').checked;
-                const setupType = document.getElementById('editSetupType').value;
-                const photoData = document.getElementById('editPhotoData').value;
-                const timestamp = document.getElementById('editTimestamp').value;
-                
-                // DEBUG: Log dos dados antes de atualizar
-                console.log("Salvando com dados:", {
-                    cellName, orderNumber, supplierName, 
-                    observation: `"${observation}"`, // Exibe as aspas para verificar espaços
-                    verificationCheck, setupType, 
-                    photoData: photoData ? "[DADOS DE FOTO]" : "null", 
-                    timestamp
-                });
-                
-                // Formatar timestamp para o formato que o servidor espera (se existir)
-                let formattedTimestamp = null;
-                if (timestamp) {
-                    // Converter de YYYY-MM-DDThh:mm para YYYY-MM-DD HH:MM:SS
-                    const dateTime = new Date(timestamp);
-                    formattedTimestamp = `${dateTime.getFullYear()}-${String(dateTime.getMonth() + 1).padStart(2, '0')}-${String(dateTime.getDate()).padStart(2, '0')} ${String(dateTime.getHours()).padStart(2, '0')}:${String(dateTime.getMinutes()).padStart(2, '0')}:00`;
-                }
-                
-                // Salvar alterações via API
-                updateSetup(cellName, orderNumber, supplierName, observation, verificationCheck, false, null, setupType, photoData, formattedTimestamp);
-            });
-            
-            // Adicionar evento para marcar como auditado
-            const markAuditedBtns = document.querySelectorAll('.mark-audited-btn');
-            markAuditedBtns.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const cellName = this.getAttribute('data-cell-name');
-                    const orderNumber = this.getAttribute('data-order-number');
-                    const supplierName = this.getAttribute('data-supplier-name');
-                    const observation = this.getAttribute('data-observation');
-                    const verificationCheck = this.getAttribute('data-verification-check') === 'True';
-                    const setupType = this.getAttribute('data-setup-type') || 'supply';
-                    
-                    // Verificar se é ação de marcar ou desmarcar
-                    const action = this.getAttribute('data-action') || 'mark';
-                    
-                    // Atualizar o atributo data-action para a função markSetupAsAudited
-                    this.setAttribute('data-action', action);
-                    
-                    markSetupAsAudited(cellName, orderNumber, supplierName, observation, verificationCheck, setupType);
-                });
-            });
-            
-            // Adicionar evento para excluir setup
-            const deleteSetupBtns = document.querySelectorAll('.delete-setup-btn');
-            deleteSetupBtns.forEach(btn => {
-                btn.addEventListener('click', function() {
-                    const cellName = this.getAttribute('data-cell-name');
-                    const orderNumber = this.getAttribute('data-order-number');
-                    const setupType = this.getAttribute('data-setup-type');
-                    
-                    // Configurar modal de confirmação
-                    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-                    confirmDeleteBtn.onclick = function() {
-                        deleteSetup(cellName, orderNumber, setupType);
-                    };
-                    
-                    // Abrir modal de confirmação
-                    const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
-                    deleteConfirmModal.show();
-                });
-            });
-        });
-        
-        // Função para atualizar setup
-        function updateSetup(cellName, orderNumber, supplierName, observation, verificationCheck, audited, auditor_name, setupType, photoData, timestamp) {
-            // Debug info
-            console.log(`updateSetup: observation=${observation}`);
-            
-            // Preparar dados para a API
-            const data = {
-                cell_name: cellName,
-                order_number: orderNumber,
-                supplier_name: supplierName,
-                observation: observation,
-                verification_check: verificationCheck,
-                setup_type: setupType
-            };
-            
-            if (audited !== undefined) {
-                data.audited = audited;
-            }
-            
-            if (auditor_name) {
-                data.auditor_name = auditor_name;
-            }
-            
-            if (photoData) {
-                data.photo_data = photoData;
-            }
-            
-            if (timestamp) {
-                data.timestamp = timestamp;
-            }
-            
-            // Enviar requisição para API
-            fetch('/api/update_setup', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Fechar o modal se estiver aberto
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('editSetupModal'));
-                    if (modal) {
-                        modal.hide();
-                    }
-                    
-                    // Mostrar mensagem de sucesso
-                    const alertContainer = document.getElementById('alertContainer');
-                    alertContainer.innerHTML = `
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            Setup atualizado com sucesso!
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                            </div>
                         </div>
-                    `;
-                    
-                    // Recarregar a página para mostrar os dados atualizados
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
-                } else {
-                    throw new Error(data.message || 'Erro ao atualizar setup');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                
-                // Mostrar mensagem de erro
-                const alertContainer = document.getElementById('alertContainer');
-                alertContainer.innerHTML = `
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        ${error.message || 'Erro ao atualizar setup'}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
-                `;
-            });
-        }
-        
-        // Função para marcar setup como auditado
-        function markSetupAsAudited(cellName, orderNumber, supplierName, observation, verificationCheck, setupType) {
-            // Desabilitar botão durante o processo
-            const btn = event.target.closest('.mark-audited-btn');
-            const originalBtnHTML = btn.innerHTML;
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
-            
-            // Verificar se é para marcar ou desmarcar auditoria
-            const action = btn.getAttribute('data-action') || 'mark';
-            
-            // Se for uma ação de marcar como auditado, mostrar o modal para anotações
-            if (action === 'mark') {
-                // Configurar o modal para enviar os dados corretos quando confirmado
-                document.getElementById('auditNotesForm').onsubmit = function(e) {
-                    e.preventDefault();
-
-                    // Verificar se o checkbox de presença foi marcado
-                    const confirmPresence = document.getElementById('confirmPresence');
-                    if (!confirmPresence.checked) {
-                        confirmPresence.classList.add('is-invalid');
-                        return false;
-                    }
-
-                    const auditNotes = document.getElementById('auditNotes').value;
-                    
-                    // Preparar dados para a API com as anotações
-                    const data = {
-                        cell_name: cellName,
-                        order_number: orderNumber,
-                        supplier_name: supplierName,
-                        observation: observation,
-                        verification_check: verificationCheck,
-                        setup_type: setupType,
-                        is_mark: true,
-                        audit_notes: auditNotes
-                    };
-                    
-                    // Chamar API para marcar como auditado com as anotações
-                    submitAuditRequest(data, btn, originalBtnHTML);
-                    
-                    // Fechar o modal
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('auditNotesModal'));
-                    modal.hide();
-                };
-                
-                // Mostrar o modal
-                const auditNotesModal = new bootstrap.Modal(document.getElementById('auditNotesModal'));
-                auditNotesModal.show();
-                
-                // Restaurar o botão
-                btn.disabled = false;
-                btn.innerHTML = originalBtnHTML;
-            } else {
-                // Se for para desmarcar, seguir o fluxo normal sem modal
-                const data = {
-                    cell_name: cellName,
-                    order_number: orderNumber,
-                    supplier_name: supplierName,
-                    observation: observation,
-                    verification_check: verificationCheck,
-                    setup_type: setupType,
-                    is_mark: false
-                };
-                
-                submitAuditRequest(data, btn, originalBtnHTML);
-            }
-        }
-        
-        // Função para excluir setup
-        function deleteSetup(cellName, orderNumber, setupType) {
-            // Preparar dados para a API
-            const data = {
-                cell_name: cellName,
-                order_number: orderNumber,
-                setup_type: setupType
-            };
-            
-            // Fechar o modal de confirmação
-            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
-            if (modal) {
-                modal.hide();
-            }
-            
-            // Mostrar mensagem de processamento
-            const alertContainer = document.getElementById('alertContainer');
-            alertContainer.innerHTML = `
-                <div class="alert alert-info alert-dismissible fade show" role="alert">
-                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                    Excluindo registro, aguarde...
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             `;
             
-            // Enviar requisição para API
-            fetch('/api/delete_setup', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Mostrar mensagem de sucesso
-                    alertContainer.innerHTML = `
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            Registro excluído com sucesso!
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    `;
-                    
-                    // Recarregar a página após um pequeno delay
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
-                } else {
-                    throw new Error(data.message || 'Erro ao excluir o registro');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                
-                // Mostrar mensagem de erro
-                alertContainer.innerHTML = `
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        ${error.message || 'Erro ao excluir o registro'}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                `;
-            });
-        }
-        
-        // Função para enviar a requisição de auditoria
-        function submitAuditRequest(data, btn, originalBtnHTML) {
-            // Desabilitar o botão durante o processo
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
+            // Remover modal anterior se existir
+            const existingModal = document.getElementById('viewNotesModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
             
-            // Enviar requisição para API
+            // Adicionar o novo modal ao body
+            document.body.insertAdjacentHTML('beforeend', modal);
+            
+            // Exibir o modal
+            const modalInstance = new bootstrap.Modal(document.getElementById('viewNotesModal'));
+            modalInstance.show();
+        }
+
+        // Função para marcar/desmarcar setup como auditado
+        function markAsAudited(cellName, orderNumber, setupType, markAs, auditNotes = '') {
+            // Mostrar indicador de carregamento
+            const loadingAlert = `
+                <div class="alert alert-info">
+                    <i class="fa fa-spinner fa-spin me-2"></i> Salvando alterações...
+                </div>
+            `;
+            document.getElementById('alertContainer').innerHTML = loadingAlert;
+
+            // Preparar dados para a requisição
+            const formData = new FormData();
+            formData.append('cell_name', cellName);
+            formData.append('order_number', orderNumber);
+            formData.append('setup_type', setupType);
+            formData.append('audited', markAs);
+            formData.append('audit_notes', auditNotes);
+
+            // Enviar requisição AJAX
             fetch('/api/mark_as_audited', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
+                body: formData
             })
             .then(response => response.json())
             .then(data => {
+                // Remover indicador de carregamento
+                document.getElementById('alertContainer').innerHTML = '';
+
                 if (data.success) {
-                    // Mostrar mensagem de sucesso
-                    const alertContainer = document.getElementById('alertContainer');
-                    const action = btn.getAttribute('data-action') || 'mark';
-                    const isMarking = action === 'mark';
-                    
-                    alertContainer.innerHTML = `
-                        <div class="alert alert-success alert-dismissible fade show" role="alert">
-                            ${isMarking ? 
-                                `Setup marcado como auditado por ${data.auditor_name}!` : 
-                                'Setup desmarcado com sucesso. Status de auditoria removido.'}
+                    // Exibir mensagem de sucesso
+                    const successAlert = `
+                        <div class="alert alert-success alert-dismissible fade show">
+                            <i class="fa fa-check-circle me-2"></i> ${data.message}
                             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                         </div>
                     `;
-                    
-                    // Obter o estado atual do URL (para manter a célula atual aberta)
-                    const currentUrl = new URL(window.location.href);
-                    const hasFilters = Array.from(currentUrl.searchParams.keys()).length > 0;
-                    
-                    // Atualizar a célula específica sem recarregar a página inteira
-                    const setupCard = document.querySelector(`.setup-item[data-cell-name="${data.cell_name}"][data-order-number="${data.order_number}"][data-setup-type="${data.setup_type}"]`);
-                    
-                    if (setupCard) {
-                        // Animar o card para indicar a mudança
-                        setupCard.classList.add('border-success');
-                        
-                        // Atualizar o conteúdo do card com o novo status de auditoria
-                        const setupItem = setupCard; // Já temos o setupItem, não precisamos procurar novamente
-                        const statusBadge = setupItem.querySelector('.audit-status');
-                        
-                        // Obter referência ao botão atual
-                        const currentBtn = setupCard.querySelector('.mark-audited-btn');
-                        
-                        if (isMarking) {
-                            // Atualizar para status auditado
-                            statusBadge.innerHTML = '<span class="badge bg-success">Auditado</span>';
-                            
-                            // Adicionar informações do auditor
-                            const auditInfoHTML = `
-                                <p><strong>Auditado por:</strong> ${data.auditor_name}</p>
-                                ${data.audit_notes ? `
-                                <div class="accordion mt-2 mb-2" id="auditNotesAccordionDynamic">
-                                    <div class="accordion-item bg-dark border-secondary">
-                                        <h2 class="accordion-header" id="auditNotesHeadingDynamic">
-                                            <button class="accordion-button collapsed bg-dark text-light py-2" type="button" 
-                                                    data-bs-toggle="collapse" data-bs-target="#auditNotesCollapseDynamic" 
-                                                    aria-expanded="false" aria-controls="auditNotesCollapseDynamic"
-                                                    style="font-size: 0.95rem;">
-                                                <strong>Anotações do Auditor</strong>
-                                            </button>
-                                        </h2>
-                                        <div id="auditNotesCollapseDynamic" class="accordion-collapse collapse" 
-                                              aria-labelledby="auditNotesHeadingDynamic" 
-                                              data-bs-parent="#auditNotesAccordionDynamic">
-                                            <div class="accordion-body py-2">
-                                                ${data.audit_notes}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>` : ''}
-                            `;
-                            
-                            // Inserir informações de auditoria após o status
-                            const infoContainer = setupItem.querySelector('.setup-info');
-                            if (!setupItem.querySelector('.audit-info')) {
-                                const auditInfoDiv = document.createElement('div');
-                                auditInfoDiv.className = 'audit-info';
-                                auditInfoDiv.innerHTML = auditInfoHTML;
-                                infoContainer.insertBefore(auditInfoDiv, infoContainer.querySelector('p:last-child'));
-                            } else {
-                                setupItem.querySelector('.audit-info').innerHTML = auditInfoHTML;
-                            }
-                            
-                            // Alterar o botão para "Desmarcar Auditoria"
-                            currentBtn.innerHTML = '<i class="fa fa-undo me-1"></i> Desmarcar Auditoria';
-                            currentBtn.className = 'btn btn-sm btn-warning mark-audited-btn';
-                            currentBtn.setAttribute('data-action', 'unmark');
-                        } else {
-                            // Atualizar para status pendente
-                            statusBadge.innerHTML = '<span class="badge bg-warning text-dark">Pendente</span>';
-                            
-                            // Remover informações do auditor se existirem
-                            const auditInfo = setupItem.querySelector('.audit-info');
-                            if (auditInfo) {
-                                auditInfo.remove();
-                            }
-                            
-                            // Alterar o botão para "Marcar como Auditado"
-                            currentBtn.innerHTML = '<i class="fa fa-check-circle me-1"></i> Marcar como Auditado';
-                            currentBtn.className = 'btn btn-sm btn-success mark-audited-btn';
-                            currentBtn.setAttribute('data-action', 'mark');
-                        }
-                        
-                        // Reabilitar o botão
-                        currentBtn.disabled = false;
-                        
-                        // Se tiver filtros aplicados, ainda precisamos recarregar a página
-                        if (hasFilters) {
-                            setTimeout(() => {
-                                window.location.reload();
-                            }, 1500);
-                        }
-                    } else {
-                        // Fallback para recarregar a página
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
-                    }
+                    document.getElementById('alertContainer').innerHTML = successAlert;
+
+                    // Recarregar a página para mostrar as alterações
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
                 } else {
-                    throw new Error(data.message || 'Erro ao marcar setup como auditado');
+                    // Exibir mensagem de erro
+                    const errorAlert = `
+                        <div class="alert alert-danger alert-dismissible fade show">
+                            <i class="fa fa-exclamation-circle me-2"></i> ${data.message}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    document.getElementById('alertContainer').innerHTML = errorAlert;
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
-                
-                // Mostrar mensagem de erro
-                const alertContainer = document.getElementById('alertContainer');
-                alertContainer.innerHTML = `
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        ${error.message || 'Erro ao marcar setup como auditado'}
+                console.error('Erro ao marcar setup como auditado:', error);
+                const errorAlert = `
+                    <div class="alert alert-danger alert-dismissible fade show">
+                        <i class="fa fa-exclamation-circle me-2"></i> Erro ao processar requisição. Tente novamente.
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
                 `;
-                
-                // Restaurar botão
-                btn.disabled = false;
-                btn.innerHTML = originalBtnHTML;
+                document.getElementById('alertContainer').innerHTML = errorAlert;
             });
         }
+
+        // Função para excluir setup
+        function deleteSetup(cellName, orderNumber, setupType) {
+            // Mostrar indicador de carregamento
+            const loadingAlert = `
+                <div class="alert alert-info">
+                    <i class="fa fa-spinner fa-spin me-2"></i> Excluindo registro...
+                </div>
+            `;
+            document.getElementById('alertContainer').innerHTML = loadingAlert;
+
+            // Preparar dados para a requisição
+            const formData = new FormData();
+            formData.append('cell_name', cellName);
+            formData.append('order_number', orderNumber);
+            formData.append('setup_type', setupType);
+
+            // Enviar requisição AJAX
+            fetch('/api/delete_setup', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Remover indicador de carregamento
+                document.getElementById('alertContainer').innerHTML = '';
+
+                if (data.success) {
+                    // Exibir mensagem de sucesso
+                    const successAlert = `
+                        <div class="alert alert-success alert-dismissible fade show">
+                            <i class="fa fa-check-circle me-2"></i> ${data.message}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    document.getElementById('alertContainer').innerHTML = successAlert;
+
+                    // Recarregar a página para mostrar as alterações
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    // Exibir mensagem de erro
+                    const errorAlert = `
+                        <div class="alert alert-danger alert-dismissible fade show">
+                            <i class="fa fa-exclamation-circle me-2"></i> ${data.message}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    document.getElementById('alertContainer').innerHTML = errorAlert;
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao excluir setup:', error);
+                const errorAlert = `
+                    <div class="alert alert-danger alert-dismissible fade show">
+                        <i class="fa fa-exclamation-circle me-2"></i> Erro ao processar requisição. Tente novamente.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                document.getElementById('alertContainer').innerHTML = errorAlert;
+            });
+        }
+
+        // Quando o documento estiver pronto
+        document.addEventListener('DOMContentLoaded', function() {
+            // Inicializar tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl)
+            });
+
+            // Form para adicionar anotações na auditoria
+            const auditNotesForm = document.getElementById('auditNotesForm');
+            if (auditNotesForm) {
+                auditNotesForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    // Verificar confirmação de presença
+                    const confirmPresence = document.getElementById('confirmPresence');
+                    if (!confirmPresence.checked) {
+                        confirmPresence.classList.add('is-invalid');
+                        return;
+                    }
+                    
+                    // Obter dados do formulário
+                    const auditNotes = document.getElementById('auditNotes').value;
+                    const cellName = auditNotesForm.getAttribute('data-cell-name');
+                    const orderNumber = auditNotesForm.getAttribute('data-order-number');
+                    const setupType = auditNotesForm.getAttribute('data-setup-type');
+                    
+                    // Marcar como auditado com as anotações
+                    markAsAudited(cellName, orderNumber, setupType, 'true', auditNotes);
+                    
+                    // Fechar o modal
+                    const auditNotesModal = bootstrap.Modal.getInstance(document.getElementById('auditNotesModal'));
+                    auditNotesModal.hide();
+                });
+            }
+
+            // Botões para marcar como auditado
+            const markAuditedButtons = document.querySelectorAll('.mark-audited-btn');
+            markAuditedButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const row = this.closest('.setup-row');
+                    const cellName = row.getAttribute('data-cell-name');
+                    const orderNumber = row.getAttribute('data-order-number');
+                    const setupType = row.getAttribute('data-setup-type');
+                    
+                    // Configurar o modal de notas
+                    const auditNotesForm = document.getElementById('auditNotesForm');
+                    auditNotesForm.setAttribute('data-cell-name', cellName);
+                    auditNotesForm.setAttribute('data-order-number', orderNumber);
+                    auditNotesForm.setAttribute('data-setup-type', setupType);
+                    
+                    // Redefinir o formulário
+                    document.getElementById('auditNotes').value = '';
+                    document.getElementById('confirmPresence').checked = false;
+                    
+                    // Exibir o modal
+                    const auditNotesModal = new bootstrap.Modal(document.getElementById('auditNotesModal'));
+                    auditNotesModal.show();
+                });
+            });
+
+            // Botões para remover marca de auditado
+            const unmarkAuditedButtons = document.querySelectorAll('.unmark-audited-btn');
+            unmarkAuditedButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    if (confirm('Tem certeza que deseja remover a marcação de auditado deste setup?')) {
+                        const row = this.closest('.setup-row');
+                        const cellName = row.getAttribute('data-cell-name');
+                        const orderNumber = row.getAttribute('data-order-number');
+                        const setupType = row.getAttribute('data-setup-type');
+                        
+                        // Remover marcação de auditado
+                        markAsAudited(cellName, orderNumber, setupType, 'false');
+                    }
+                });
+            });
+
+            // Botões para excluir setup
+            const deleteButtons = document.querySelectorAll('.delete-setup-btn');
+            deleteButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const row = this.closest('.setup-row');
+                    const cellName = row.getAttribute('data-cell-name');
+                    const orderNumber = row.getAttribute('data-order-number');
+                    const setupType = row.getAttribute('data-setup-type');
+                    
+                    // Atualizar o modal de confirmação
+                    document.getElementById('deleteModalCell').textContent = cellName;
+                    document.getElementById('deleteModalOrder').textContent = orderNumber;
+                    document.getElementById('deleteModalType').textContent = 
+                        setupType === 'removal' ? 'Retirada' : 'Abastecimento';
+                    
+                    // Configurar botão de confirmação
+                    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+                    confirmDeleteBtn.onclick = function() {
+                        // Fechar o modal
+                        const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+                        deleteModal.hide();
+                        
+                        // Excluir o registro
+                        deleteSetup(cellName, orderNumber, setupType);
+                    };
+                    
+                    // Exibir o modal
+                    const deleteModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+                    deleteModal.show();
+                });
+            });
+
+            // Botões para visualizar detalhes
+            const viewDetailsButtons = document.querySelectorAll('.view-details-btn');
+            viewDetailsButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const row = this.closest('.setup-row');
+                    
+                    // Extrair todos os dados do setup
+                    const setupData = {
+                        cellName: row.getAttribute('data-cell-name'),
+                        orderNumber: row.getAttribute('data-order-number'),
+                        setupType: row.getAttribute('data-setup-type'),
+                        timestamp: row.getAttribute('data-timestamp'),
+                        supplierName: row.getAttribute('data-supplier-name'),
+                        observation: row.getAttribute('data-observation'),
+                        audited: row.getAttribute('data-audited') === 'true',
+                        auditorName: row.getAttribute('data-auditor-name'),
+                        auditNotes: row.getAttribute('data-audit-notes'),
+                        verificationCheck: row.getAttribute('data-verification-check') === 'true'
+                    };
+                    
+                    // Dados específicos para abastecimento
+                    if (setupData.setupType === 'supply') {
+                        setupData.productCode = row.getAttribute('data-product-code');
+                        setupData.productName = row.getAttribute('data-product-name');
+                        setupData.productPO = row.getAttribute('data-product-po');
+                    }
+                    
+                    // Atualizar título do modal
+                    const setupType = setupData.setupType === 'removal' ? 'Retirada' : 'Abastecimento';
+                    document.getElementById('setupDetailsModalLabel').textContent = 
+                        `Detalhes do Setup - ${setupType} (${setupData.orderNumber})`;
+                    
+                    // Estruturar o conteúdo HTML para o modal
+                    let detailsHTML = `
+                        <div class="setup-details">
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <h6 class="text-muted">Informações Básicas</h6>
+                                    <ul class="list-group">
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Célula:</span>
+                                            <span class="fw-bold">${setupData.cellName}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Ordem de Produção:</span>
+                                            <span class="fw-bold">${setupData.orderNumber}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Tipo de Setup:</span>
+                                            <span class="fw-bold">
+                                                ${setupData.setupType === 'removal' 
+                                                    ? '<span class="badge bg-danger">Retirada</span>' 
+                                                    : '<span class="badge bg-primary">Abastecimento</span>'}
+                                            </span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Data/Hora:</span>
+                                            <span class="fw-bold">${setupData.timestamp}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Abastecedor:</span>
+                                            <span class="fw-bold">${setupData.supplierName}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Verificação:</span>
+                                            <span class="fw-bold">
+                                                ${setupData.verificationCheck 
+                                                    ? '<span class="text-success"><i class="fa fa-check"></i> Verificado</span>' 
+                                                    : '<span class="text-danger"><i class="fa fa-times"></i> Não verificado</span>'}
+                                            </span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="text-muted">Status de Auditoria</h6>
+                                    <ul class="list-group">
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Status:</span>
+                                            <span class="fw-bold">
+                                                ${setupData.audited 
+                                                    ? '<span class="badge bg-success"><i class="fa fa-check-circle me-1"></i> Auditado</span>' 
+                                                    : '<span class="badge bg-warning text-dark"><i class="fa fa-clock-o me-1"></i> Pendente</span>'}
+                                            </span>
+                                        </li>
+                                        ${setupData.audited ? `
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Auditor:</span>
+                                            <span class="fw-bold">${setupData.auditorName || 'Não informado'}</span>
+                                        </li>` : ''}
+                                    </ul>
+                    `;
+                    
+                    // Seção específica para abastecimento (produtos)
+                    if (setupData.setupType === 'supply') {
+                        detailsHTML += `
+                                    <h6 class="text-muted mt-3">Informações do Produto</h6>
+                                    <ul class="list-group">
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Código:</span>
+                                            <span class="fw-bold">${setupData.productCode || 'Não informado'}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>Nome:</span>
+                                            <span class="fw-bold">${setupData.productName || 'Não informado'}</span>
+                                        </li>
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>PO do Fornecedor:</span>
+                                            <span class="fw-bold">${setupData.productPO || 'Não informado'}</span>
+                                        </li>
+                                    </ul>
+                        `;
+                    }
+                    
+                    // Fechar a div da coluna e iniciar seção para observações
+                    detailsHTML += `
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="text-muted">Observações do Abastecedor</h6>
+                                    <div class="p-3 bg-dark border rounded mb-3">
+                                        ${setupData.observation 
+                                            ? setupData.observation.replace(/\n/g, '<br>') 
+                                            : '<em class="text-muted">Nenhuma observação registrada.</em>'}
+                                    </div>
+                                </div>
+                    `;
+                    
+                    // Adicionar seção de anotações do auditor
+                    detailsHTML += `
+                                <div class="col-md-6">
+                                    <h6 class="text-muted">Anotações do Auditor</h6>
+                                    <div class="p-3 bg-dark border rounded">
+                                        ${setupData.auditNotes 
+                                            ? setupData.auditNotes.replace(/\n/g, '<br>') 
+                                            : '<em class="text-muted">Nenhuma anotação registrada.</em>'}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <h6 class="text-muted">Fotos do Setup</h6>
+                                    <div class="d-flex justify-content-center" id="setupImagesCarousel">
+                                        <p class="text-muted">
+                                            <i class="fa fa-spinner fa-spin me-2"></i> Carregando imagens...
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Atualizar o conteúdo do modal
+                    document.getElementById('setupDetailsContent').innerHTML = detailsHTML;
+                    
+                    // Exibir o modal
+                    const detailsModal = new bootstrap.Modal(document.getElementById('setupDetailsModal'));
+                    detailsModal.show();
+                    
+                    // Carregar imagens do setup
+                    fetch(`/api/get_setup_images/${setupData.cellName}/${setupData.orderNumber}/${setupData.setupType}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.images && data.images.length > 0) {
+                            // Criar carrossel para as imagens
+                            let carouselHTML = `
+                                <div id="setupPhotosCarousel" class="carousel slide" data-bs-ride="carousel">
+                                    <div class="carousel-indicators">
+                            `;
+                            
+                            // Adicionar indicadores
+                            data.images.forEach((image, index) => {
+                                carouselHTML += `
+                                    <button type="button" data-bs-target="#setupPhotosCarousel" 
+                                            data-bs-slide-to="${index}" 
+                                            class="${index === 0 ? 'active' : ''}"
+                                            aria-current="${index === 0 ? 'true' : 'false'}" 
+                                            aria-label="Foto ${index + 1}"></button>
+                                `;
+                            });
+                            
+                            carouselHTML += `
+                                    </div>
+                                    <div class="carousel-inner">
+                            `;
+                            
+                            // Adicionar as imagens
+                            data.images.forEach((image, index) => {
+                                carouselHTML += `
+                                    <div class="carousel-item ${index === 0 ? 'active' : ''}">
+                                        <img src="${image}" class="d-block mx-auto" style="max-height: 400px;" alt="Foto do Setup ${index + 1}">
+                                    </div>
+                                `;
+                            });
+                            
+                            // Adicionar controles
+                            carouselHTML += `
+                                    </div>
+                                    <button class="carousel-control-prev" type="button" data-bs-target="#setupPhotosCarousel" data-bs-slide="prev">
+                                        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                        <span class="visually-hidden">Anterior</span>
+                                    </button>
+                                    <button class="carousel-control-next" type="button" data-bs-target="#setupPhotosCarousel" data-bs-slide="next">
+                                        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                        <span class="visually-hidden">Próximo</span>
+                                    </button>
+                                </div>
+                            `;
+                            
+                            // Atualizar o container de imagens
+                            document.getElementById('setupImagesCarousel').innerHTML = carouselHTML;
+                        } else {
+                            // Exibir mensagem quando não há imagens
+                            document.getElementById('setupImagesCarousel').innerHTML = `
+                                <div class="alert alert-warning">
+                                    <i class="fa fa-exclamation-triangle me-2"></i> Nenhuma imagem disponível para este setup.
+                                </div>
+                            `;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao carregar imagens:', error);
+                        document.getElementById('setupImagesCarousel').innerHTML = `
+                            <div class="alert alert-danger">
+                                <i class="fa fa-exclamation-circle me-2"></i> Erro ao carregar imagens. Tente novamente.
+                            </div>
+                        `;
+                    });
+                });
+            });
+        });
     </script>
-    
+
     <style>
         /* Estilos adicionais para auditoria */
         .audit-badge {
             font-size: 0.9rem;
-            padding: 0.5rem 0.7rem;
+        }
+        
+        .setup-row {
+            transition: background-color 0.3s ease;
+        }
+        
+        .setup-row:hover {
+            background-color: rgba(0, 123, 255, 0.1);
+        }
+        
+        .setup-info {
+            font-size: 0.9rem;
         }
         
         .audit-cell-section {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding: 1.5rem 0;
             margin-bottom: 1rem;
+            border-bottom: 1px solid #444;
+            padding-bottom: 1rem;
         }
         
         .audit-cell-section:last-child {
             border-bottom: none;
         }
         
-        .setup-image {
-            max-width: 100%;
-            max-height: 200px;
-            border-radius: 4px;
-            border: 1px solid #444;
+        /* Estilos para os contadores */
+        .progress {
+            background-color: #333;
+            height: 25px;
+            font-weight: bold;
         }
         
-        /* Estilo para formulário de filtro */
-        .form-select, .form-control {
-            background-color: #2b3035;
-            border-color: #495057;
-            color: #e9ecef;
+        .badge {
+            font-size: 0.85rem;
+            padding: 0.35em 0.65em;
         }
         
-        /* Estilo para botões agrupados */
-        .btn-group {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+        /* Estilos para ações */
+        .btn-group-sm .btn {
+            padding: 0.25rem 0.5rem;
         }
         
-        .btn-group .btn {
-            margin-bottom: 0.5rem;
-            width: 100%;
+        /* Modal de detalhes */
+        .setup-details .list-group-item {
+            background-color: #333;
+            border-color: #444;
+        }
+        
+        /* Tooltip personalizado */
+        .tooltip .tooltip-inner {
+            max-width: 200px;
+            padding: 8px 10px;
+            background-color: #212529;
+            font-size: 0.9rem;
         }
     </style>
 </body>
