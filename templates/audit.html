@@ -220,50 +220,7 @@
                 {% set audited_all = audited_all + cell_audited %}
             {% endfor %}
             
-            <!-- Resumo Geral -->
-            <div class="card mb-3">
-                <div class="card-header bg-dark py-2">
-                    <h6 class="mb-0">Resumo Geral</h6>
-                </div>
-                <div class="card-body py-2">
-                    <div class="row align-items-center">
-                        <div class="col-sm-4 mb-2 mb-sm-0">
-                            <div class="d-flex justify-content-center">
-                                <div class="text-center">
-                                    <div class="fs-2">{{ total_all }}</div>
-                                    <div class="small text-muted">Total de Registros</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-sm-4 mb-2 mb-sm-0">
-                            <div class="d-flex justify-content-center">
-                                <div class="text-center">
-                                    <div class="fs-2 text-success">{{ audited_all }}</div>
-                                    <div class="small text-muted">Auditados</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-sm-4">
-                            <div class="d-flex justify-content-center">
-                                <div class="text-center">
-                                    <div class="fs-2 text-warning">{{ total_all - audited_all }}</div>
-                                    <div class="small text-muted">Pendentes</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="progress mt-2" style="height: 8px;">
-                        {% if total_all > 0 %}
-                            {% set progress_percent = (audited_all / total_all) * 100 %}
-                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ progress_percent }}%;" 
-                                aria-valuenow="{{ progress_percent }}" aria-valuemin="0" aria-valuemax="100">
-                            </div>
-                        {% else %}
-                            <div class="progress-bar bg-secondary" role="progressbar" style="width: 100%"></div>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
+            
 
             <div class="accordion mb-3" id="cellsAccordion">
                 {% for cell_name, setups in cells.items() %}
@@ -281,7 +238,7 @@
                                         <span class="d-none d-sm-inline">Célula:</span> {{ cell_name }}
                                     </div>
                                     <div class="badge-group ms-2 d-flex flex-wrap justify-content-end">
-                                        <span class="badge rounded-pill bg-secondary me-1">{{ total_setups }}</span>
+                                        <span class="badge rounded-pill bg-primary me-1">{{ total_setups }}</span>
                                         <span class="badge rounded-pill bg-success me-1">{{ audited_count }}</span>
                                         <span class="badge rounded-pill bg-warning text-dark">{{ pending_count }}</span>
                                     </div>
