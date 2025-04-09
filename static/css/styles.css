@@ -1,0 +1,156 @@
+/* Custom styles to complement Bootstrap */
+
+/* Main container padding */
+.main-container {
+    padding-top: 30px;
+    padding-bottom: 30px;
+}
+
+/* Card customizations */
+.card {
+    margin-bottom: 1.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+    font-weight: 600;
+}
+
+/* Button styling */
+.main-btn {
+    padding: 15px 20px;
+    font-size: 1.1rem;
+    margin: 10px 0;
+    width: 100%;
+}
+
+/* Logo and header styling */
+.app-header {
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.app-title {
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.app-subtitle {
+    font-weight: 300;
+    margin-bottom: 1.5rem;
+    opacity: 0.8;
+}
+
+/* QR code scanner container */
+.scanner-container {
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 20px;
+    text-align: center;
+}
+
+#reader {
+    width: 100%;
+    height: 300px;
+    margin: 0 auto;
+}
+
+/* Setup form styling */
+.cell-name-header {
+    background-color: var(--bs-primary);
+    color: white;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 600;
+}
+
+/* Form validation styling */
+.was-validated .form-check-input:invalid ~ .form-check-label,
+.was-validated .form-check-input:valid ~ .form-check-label {
+    color: inherit;
+}
+
+/* Image preview container */
+.image-preview-container {
+    margin: 15px 0;
+    text-align: center;
+}
+
+#imagePreview {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 5px;
+    display: none;
+}
+
+/* Audit page styling */
+.audit-cell-section {
+    margin-bottom: 30px;
+    padding: 15px;
+    border-radius: 5px;
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.setup-image {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 5px;
+}
+
+.setup-details {
+    font-size: 0.9rem;
+}
+
+/* Back button */
+.back-button {
+    margin-bottom: 20px;
+}
+
+/* Login form */
+.login-container {
+    max-width: 400px;
+    margin: 0 auto;
+}
+
+/* Loading indicator */
+.loading-spinner {
+    display: inline-block;
+    width: 2rem;
+    height: 2rem;
+    vertical-align: text-bottom;
+    border: 0.25em solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spinner-border .75s linear infinite;
+}
+
+/* Media queries for better responsiveness */
+@media (min-width: 768px) {
+    .main-btn {
+        width: auto;
+        min-width: 200px;
+    }
+}
+
+@media (max-width: 767px) {
+    .container {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    .audit-cell-section {
+        padding: 10px;
+    }
+}

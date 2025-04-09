@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastrar Setup | Sistema de Setup de Células</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/custom-green-theme.css') }}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container main-container">
+        <!-- Header -->
+        <div class="app-header">
+            <h1 class="app-title">Cadastrar Setup</h1>
+            <p class="app-subtitle">Registre o setup de uma célula de produção</p>
+        </div>
+
+        <!-- Back button -->
+        <div class="back-button">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                <i class="fa fa-arrow-left me-2"></i> Voltar
+            </a>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- QR Code Scanner -->
+        <div class="row justify-content-center mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Escaneie o QR Code da Célula</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="scanBtnContainer" {% if cell_name %}style="display: none;"{% endif %}>
+                            <p class="mb-3">
+                                Para iniciar o cadastro de setup, escaneie o QR Code da célula de produção.
+                            </p>
+                            <div class="text-center">
+                                <button id="scanQrCodeBtn" class="btn btn-primary">
+                                    <i class="fa fa-qrcode me-2"></i> Escanear QR Code
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="scannerContainer" style="display: none;">
+                            <div class="scanner-container">
+                                <div id="reader"></div>
+                                <div id="scannerMessage" class="mt-3"></div>
+                            </div>
+                        </div>
+
+                        <div id="cellNameDisplay" {% if not cell_name %}style="display: none;"{% endif %}>
+                            <div class="cell-name-header">
+                                <i class="fa fa-industry me-2"></i>
+                                Célula: <span id="cellNameHeader">{{ cell_name }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Setup Type Selection -->
+        <div id="setupTypeSelectionContainer" {% if not cell_name %}style="display: none;"{% endif %}>
+            <div class="row justify-content-center mb-4">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Selecione o Tipo de Operação</h5>
+                        </div>
+                        <div class="card-body">
+                            <h6 class="mb-4">Para a célula: <strong id="cellNameTypeSelection">{{ cell_name }}</strong></h6>
+                            
+                            <div id="setupTypeStatus" class="alert alert-info mb-4" style="display: none;">
+                                <!-- Status dinâmico será inserido aqui pelo JavaScript -->
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3 mb-md-0">
+                                    <div class="card h-100 bg-dark setup-type-card" data-setup-type="removal">
+                                        <div class="card-body text-center">
+                                            <i class="fa fa-minus-circle fa-3x mb-3 text-danger"></i>
+                                            <h5 class="card-title text-white">Retirada de Material</h5>
+                                            <p class="card-text text-white">Registrar a remoção de materiais do produto anterior.</p>
+                                            <button id="setupTypeRemoval" class="btn btn-danger btn-setup-type" data-setup-type="removal">
+                                                <i class="fa fa-arrow-circle-down me-2"></i> Registrar Retirada
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card h-100 bg-dark setup-type-card" data-setup-type="supply">
+                                        <div class="card-body text-center">
+                                            <i class="fa fa-plus-circle fa-3x mb-3 text-success"></i>
+                                            <h5 class="card-title text-white">Abastecimento de Material</h5>
+                                            <p class="card-text text-white">Registrar o abastecimento de materiais do novo produto.</p>
+                                            <button id="setupTypeSupply" class="btn btn-success btn-setup-type" data-setup-type="supply">
+                                                <i class="fa fa-arrow-circle-up me-2"></i> Registrar Abastecimento
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Reset Cell Flow Button (apenas para auditores) -->
+                            {% if user_profile == 'auditor' %}
+                            <div class="row mt-4">
+                                <div class="col-12 text-center">
+                                    <button id="resetCellFlowBtn" class="btn btn-warning">
+                                        <i class="fa fa-refresh me-2"></i> Resetar Fluxo da Célula
+                                    </button>
+                                    <div class="small text-muted mt-2">
+                                        <i class="fa fa-info-circle me-1"></i> 
+                                        Esta opção permite que você reset o fluxo da célula, liberando todas as operações
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Setup Form -->
+        <div id="setupFormContainer" style="display: none;">
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Formulário de <span id="setupTypeTitle">Cadastro de Setup</span></h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="setupForm" action="{{ url_for('setup') }}" method="POST" class="needs-validation" novalidate>
+                                <!-- Hidden cell name from QR code -->
+                                <input type="hidden" id="cellName" name="cell_name" value="{{ cell_name }}">
+                                
+                                <!-- Hidden setup type -->
+                                <input type="hidden" id="setupType" name="setup_type" value="supply">
+                                
+                                <!-- Order Number -->
+                                <div class="mb-3">
+                                    <label for="orderNumber" class="form-label">Número da Ordem de Produção</label>
+                                    <input type="text" class="form-control" id="orderNumber" name="order_number" required>
+                                    <div class="invalid-feedback">
+                                        Por favor, insira o número da ordem de produção.
+                                    </div>
+                                </div>
+                                
+                                <!-- Supplier Name - só exibir se não for perfil de abastecedor -->
+                                <div class="mb-3" id="supplierInputContainer" {% if user_profile == 'supplier' %}style="display: none;"{% endif %}>
+                                    <label for="supplierName" class="form-label">Nome do <span id="operatorLabel">Abastecedor</span></label>
+                                    <input type="text" class="form-control" id="supplierName" name="supplier_name" {% if user_profile != 'supplier' %}required{% endif %}>
+                                    <div class="invalid-feedback">
+                                        Por favor, insira o nome do operador.
+                                    </div>
+                                </div>
+                                
+                                <!-- Informação de usuário logado (apenas para abastecedores) -->
+                                <div class="mb-3" id="supplierUserContainer" {% if user_profile != 'supplier' %}style="display: none;"{% endif %}>
+                                    <label class="form-label">Abastecedor</label>
+                                    <div class="alert alert-info mb-0">
+                                        <i class="fa fa-user me-2"></i> 
+                                        Você está registrando este setup como: <strong>{{ username }}</strong>
+                                    </div>
+                                    <!-- Campo oculto para enviar o nome do usuário quando for perfil de abastecedor -->
+                                    <input type="hidden" name="supplier_name" value="{{ username }}">
+                                </div>
+                                
+                                <!-- Photo Upload -->
+                                <div class="mb-3">
+                                    <label for="photoInput" class="form-label">Fotos do Setup</label>
+                                    <input type="file" class="form-control" id="photoInput" accept="image/*" required multiple>
+                                    <small class="text-muted">Você pode selecionar múltiplas imagens ao mesmo tempo.</small>
+                                    <div class="invalid-feedback">
+                                        Por favor, selecione pelo menos uma foto do setup.
+                                    </div>
+                                    
+                                    <!-- Hidden input to store base64 image data -->
+                                    <input type="hidden" id="photoData" name="photo_data">
+                                    
+                                    <!-- Images preview -->
+                                    <div class="image-preview-container mt-3">
+                                        <div id="imagesCarousel" class="carousel slide" data-bs-ride="carousel">
+                                            <div class="carousel-inner" id="carouselInner">
+                                                <!-- As imagens serão inseridas aqui via JavaScript -->
+                                                <div class="carousel-item active">
+                                                    <div class="d-flex justify-content-center">
+                                                        <img id="noImagePlaceholder" src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMjAiIGZpbGw9IiNmZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPlNlbGVjaW9uZSBGb3RvczwvdGV4dD48L3N2Zz4=" alt="Selecione fotos" class="img-fluid">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <!-- Controles do carrossel serão adicionados quando houver mais de uma imagem -->
+                                        </div>
+                                        
+                                        <!-- Contador de imagens -->
+                                        <div id="imageCounter" class="text-center mt-2 d-none">
+                                            <span class="badge bg-primary">0 imagens selecionadas</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+<!-- Product selection (apenas para abastecimento) -->
+<div class="mb-3 supply-fields" style="display: none;">
+    <label for="productSelection" class="form-label">Produto</label>
+    <div class="row">
+        <div class="col-md-4 mb-2 mb-md-0">
+            <input type="text" class="form-control" id="productCode" name="product_code" placeholder="Código">
+            <input type="hidden" id="productName" name="product_name">
+            <input type="hidden" id="selectedItems" name="selected_items">
+        </div>
+        <div class="col-md-8">
+            <select class="form-select" id="productSelection">
+                <option value="" selected>Selecione um produto</option>
+                {% for product in cell_products %}
+                <option value="{{ product.code }}" data-name="{{ product.name }}">
+                    {{ product.code }} - {{ product.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="form-text" id="productHelp">Selecione ou digite o código do produto para esta célula.</div>
+    
+    <!-- PO do fornecedor para o produto -->
+    <div class="mt-3 productPOContainer">
+        <label for="productPO" class="form-label">PO do Fornecedor para o Produto (opcional)</label>
+        <input type="text" class="form-control" id="productPO" name="product_po" placeholder="PO do fornecedor">
+        <div class="form-text">Digite o número do PO do fornecedor para este produto, se aplicável.</div>
+    </div>
+</div>
+
+<!-- Item selection (apenas para abastecimento) -->
+<div class="mb-3 supply-fields" style="display: none;">
+    <label class="form-label">Itens do Produto</label>
+    <div id="itemsContainer" class="border p-3 rounded mb-3 bg-dark">
+        <div id="noItemsMessage" class="text-center text-muted">
+            <i class="fa fa-info-circle me-2"></i> Selecione um produto para ver os itens disponíveis
+        </div>
+        <div id="itemsList" class="row" style="display: none;">
+            <!-- Os itens serão adicionados aqui dinamicamente -->
+        </div>
+    </div>
+</div>
+                                <!-- Observation -->
+                                <div class="mb-3">
+                                    <label for="observation" class="form-label">Observações do Abastecedor (opcional)</label>
+                                    <textarea class="form-control" id="observation" name="observation" rows="3"></textarea>
+                                </div>
+                                
+                                <!-- Verification Checkbox -->
+                                <div class="mb-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="on" id="verificationCheck" name="verification_check" required>
+                                        <label class="form-check-label" for="verificationCheck" id="verificationLabel">
+                                            Confirmo que verifiquei todos os itens necessários
+                                        </label>
+                                        <div class="invalid-feedback">
+                                            Você deve confirmar a verificação antes de finalizar.
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Submit Button -->
+                                <div class="text-center">
+                                    <button type="submit" id="finalizeButton" class="btn btn-success" disabled>
+                                        <i class="fa fa-check me-2"></i> Finalizar Cadastro
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Incluir jsQR para escanear QR codes -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/camera-scanner.js') }}"></script>
+    <script src="{{ url_for("static", filename="js/setup-form-validation.js") }}"></script>
+    <script src="{{ url_for('static', filename='js/setup-products.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/product-selection.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/setup-form-validation.js') }}"></script>
+    <script>
+    // Script para carregar produtos da célula via API quando o QR code é escaneado
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log("Inicializando carregamento de produtos para a página de setup");
+        
+        // Elementos DOM relacionados a produtos
+        const productSelection = document.getElementById('productSelection');
+        const cellNameInput = document.getElementById('cellName');
+        const qrcodeValue = new URLSearchParams(window.location.search).get('qrcode');
+        
+        // Verificar se os elementos existem
+        console.log("productSelection encontrado:", !!productSelection);
+        console.log("cellNameInput encontrado:", !!cellNameInput);
+        console.log("QR code na URL:", qrcodeValue);
+        
+        // Função para carregar produtos via API
+        function loadCellProducts() {
+            // Se não tivermos o valor do QR code, não podemos continuar
+            if (!qrcodeValue) {
+                console.log("Nenhum QR code fornecido na URL");
+                return;
+            }
+            
+            // Primeiro, verificar se já temos produtos no dropdown
+            if (productSelection && productSelection.options.length > 1) {
+                console.log("Produtos já estão carregados no dropdown");
+                return;
+            }
+            
+            // Passo 1: Obter o nome da célula a partir do QR code
+            fetch(`/api/get_cell_name/${qrcodeValue}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const cellName = data.cell_name;
+                        console.log(`QR code ${qrcodeValue} corresponde à célula ${cellName}`);
+                        
+                        if (cellNameInput && !cellNameInput.value) {
+                            cellNameInput.value = cellName;
+                        }
+                        
+                        // Passo 2: Buscar produtos diretamente do arquivo JSON
+                        fetch(`/api/cell_products/${cellName}`)
+                            .then(response => response.json())
+                            .then(productsData => {
+                                if (productsData.success && productsData.products && productsData.products.length > 0) {
+                                    console.log(`Produtos carregados via API: ${productsData.products.length}`);
+                                    updateProductDropdown(productsData.products);
+                                } else {
+                                    console.log("Nenhum produto retornado pela API");
+                                    showNoProductsWarning();
+                                }
+                            })
+                            .catch(error => {
+                                console.error("Erro ao carregar produtos:", error);
+                                showNoProductsWarning();
+                            });
+                    } else {
+                        console.error("QR code não encontrado:", data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error("Erro ao obter nome da célula:", error);
+                });
+        }
+        
+        // Função para atualizar o dropdown de produtos
+        function updateProductDropdown(products) {
+            if (!productSelection) return;
+            
+            // Manter apenas a primeira opção (Selecione um produto)
+            while (productSelection.options.length > 1) {
+                productSelection.remove(1);
+            }
+            
+            // Adicionar cada produto ao dropdown
+            products.forEach(product => {
+                const option = document.createElement('option');
+                option.value = product.code;
+                option.text = `${product.code} - ${product.name}`;
+                option.setAttribute('data-name', product.name);
+                productSelection.appendChild(option);
+            });
+            
+            // Remover qualquer aviso existente
+            const existingAlert = document.querySelector('.product-alert-message');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+            
+            // Se estamos na tela de setup e o tipo é 'supply', atualizar a visibilidade dos campos
+            const setupType = document.getElementById('setupType')?.value;
+            if (setupType === 'supply') {
+                const supplyFields = document.querySelectorAll('.supply-fields');
+                supplyFields.forEach(field => {
+                    field.style.display = 'block';
+                });
+            }
+        }
+        
+        // Função para mostrar aviso de que não há produtos
+        function showNoProductsWarning() {
+            // Verificar se já existe um alerta
+            const existingAlert = document.querySelector('.product-alert-message');
+            if (existingAlert) return;
+            
+            // Criar alerta
+            const alertMessage = document.createElement('div');
+            alertMessage.className = 'alert alert-warning mt-3 product-alert-message';
+            alertMessage.innerHTML = `
+                <i class="fa fa-exclamation-triangle me-2"></i>
+                <strong>Atenção:</strong> Nenhum produto cadastrado para esta célula.
+                Por favor, solicite a um auditor para cadastrar produtos na célula.
+            `;
+            
+            // Inserir o alerta no formulário
+            const supplyFields = document.querySelectorAll('.supply-fields');
+            if (supplyFields.length > 0) {
+                supplyFields[0].before(alertMessage);
+            }
+        }
+        
+        // Tentar carregar produtos após um pequeno atraso para garantir que o restante da página esteja carregado
+        setTimeout(loadCellProducts, 500);
+        
+        // Adicionar botão para recarregar produtos
+        const productSelectionParent = productSelection?.parentElement?.parentElement;
+        if (productSelectionParent) {
+            const reloadBtn = document.createElement('button');
+            reloadBtn.type = 'button';
+            reloadBtn.className = 'btn btn-sm btn-outline-secondary mt-2';
+            reloadBtn.innerHTML = '<i class="fa fa-refresh me-1"></i> Recarregar Produtos';
+            reloadBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                loadCellProducts();
+            });
+            
+            productSelectionParent.appendChild(reloadBtn);
+        }
+    });
+    </script>
+    
+    <style>
+        /* Adicionar estilos adicionais para o scanner */
+        #reader {
+            margin: 0 auto;
+            max-width: 400px;
+        }
+        
+        .scanner-message {
+            padding: 10px;
+            margin-top: 10px;
+            text-align: center;
+            border-radius: 4px;
+        }
+        
+        .text-success {
+            color: #28a745;
+        }
+        
+        .text-danger {
+            color: #dc3545;
+        }
+        
+        .text-warning {
+            color: #ffc107;
+        }
+        
+        .text-info {
+            color: #17a2b8;
+        }
+        
+        #scannerMessage {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        
+        .image-preview-container {
+            margin-top: 15px;
+            text-align: center;
+        }
+        
+        #imagePreview {
+            max-width: 100%;
+            max-height: 300px;
+            display: none;
+            margin: 0 auto;
+            border: 1px solid #666;
+            border-radius: 4px;
+        }
+        
+        /* Estilos para os cards de tipo de setup */
+        .card.setup-type-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        
+        .card.setup-type-card:hover:not(.disabled) {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .card.setup-type-card.disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-color: #f1f1f1 !important;
+        }
+        
+        .btn-setup-type {
+            width: 100%;
+        }
+        
+        .btn-setup-type.disabled, 
+        .btn-setup-type:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        
+        /* Feedback visual para cards de setup */
+        .card.setup-type-card.completed {
+            border-color: #28a745;
+            background-color: rgba(40, 167, 69, 0.1) !important;
+        }
+        
+        .card.setup-type-card.pending {
+            border-color: #ffc107;
+        }
+    </style>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elementos do formulário
+            const photoInput = document.getElementById('photoInput');
+            const imagePreview = document.getElementById('imagePreview');
+            const photoData = document.getElementById('photoData');
+            const finalizeButton = document.getElementById('finalizeButton');
+            const setupTypeSelectionContainer = document.getElementById('setupTypeSelectionContainer');
+            const setupFormContainer = document.getElementById('setupFormContainer');
+            const setupTypeRemovalBtn = document.getElementById('setupTypeRemoval');
+            const setupTypeSupplyBtn = document.getElementById('setupTypeSupply');
+            const setupTypeInput = document.getElementById('setupType');
+            const setupTypeTitle = document.getElementById('setupTypeTitle');
+            const operatorLabel = document.getElementById('operatorLabel');
+            const verificationLabel = document.getElementById('verificationLabel');
+            const setupTypeStatus = document.getElementById('setupTypeStatus');
+            const cellNameTypeSelection = document.getElementById('cellNameTypeSelection');
+            const cellName = document.getElementById('cellName').value;
+            
+            // Função para verificar status dos setups para uma ordem de produção
+            async function checkSetupStatus(cellName, orderNumber) {
+                try {
+                    const response = await fetch(`/api/check_setup_status?cell_name=${cellName}&order_number=${orderNumber}`);
+                    if (response.ok) {
+                        return await response.json();
+                    }
+                    return { 
+                        has_removal: false,
+                        has_supply: false,
+                        message: "Não foi possível verificar o status"
+                    };
+                } catch (error) {
+                    console.error('Erro ao verificar status do setup:', error);
+                    return { 
+                        has_removal: false,
+                        has_supply: false,
+                        message: "Erro ao verificar status"
+                    };
+                }
+            }
+            
+            // Função para mostrar status do setup
+            function updateSetupStatusDisplay(statusData) {
+                if (!setupTypeStatus) return;
+                
+                setupTypeStatus.style.display = 'block';
+                
+                if (statusData.has_removal && statusData.has_supply) {
+                    // Ambos os setups já foram registrados
+                    setupTypeStatus.className = 'alert alert-success mb-4';
+                    setupTypeStatus.innerHTML = `
+                        <i class="fa fa-check-circle me-2"></i>
+                        <strong>Setup Completo:</strong> Retirada e abastecimento já foram registrados para esta ordem.
+                    `;
+                    setupTypeRemovalBtn.disabled = true;
+                    setupTypeSupplyBtn.disabled = true;
+                } else if (statusData.has_removal) {
+                    // Apenas retirada foi registrada
+                    setupTypeStatus.className = 'alert alert-warning mb-4';
+                    setupTypeStatus.innerHTML = `
+                        <i class="fa fa-exclamation-triangle me-2"></i>
+                        <strong>Retirada Registrada:</strong> Apenas o abastecimento ainda precisa ser registrado.
+                    `;
+                    setupTypeRemovalBtn.disabled = true;
+                    setupTypeSupplyBtn.disabled = false;
+                } else if (statusData.has_supply) {
+                    // Apenas abastecimento foi registrado
+                    setupTypeStatus.className = 'alert alert-warning mb-4';
+                    setupTypeStatus.innerHTML = `
+                        <i class="fa fa-exclamation-triangle me-2"></i>
+                        <strong>Abastecimento Registrado:</strong> Apenas a retirada ainda precisa ser registrada.
+                    `;
+                    setupTypeRemovalBtn.disabled = false;
+                    setupTypeSupplyBtn.disabled = true;
+                } else {
+                    // Nenhum setup foi registrado
+                    setupTypeStatus.className = 'alert alert-info mb-4';
+                    setupTypeStatus.innerHTML = `
+                        <i class="fa fa-info-circle me-2"></i>
+                        <strong>Novo Setup:</strong> Nenhum registro encontrado para esta ordem. Por favor, registre a retirada e o abastecimento.
+                    `;
+                    setupTypeRemovalBtn.disabled = false;
+                    setupTypeSupplyBtn.disabled = false;
+                }
+            }
+            
+            // Configurar eventos para os botões de tipo de setup
+            if (setupTypeRemovalBtn && setupTypeSupplyBtn) {
+                // Quando o número da ordem mudar, verificar o status
+                const orderNumberInput = document.createElement('input');
+                orderNumberInput.type = 'text';
+                orderNumberInput.className = 'form-control mb-3';
+                orderNumberInput.placeholder = 'Digite o número da ordem de produção';
+                orderNumberInput.id = 'orderNumberCheck';
+                
+                // Inserir o input no topo da seção de seleção de tipo
+                const cardBody = setupTypeRemovalBtn.closest('.card-body');
+                cardBody.insertBefore(orderNumberInput, cardBody.firstChild);
+                
+                // Adicionar evento de change para verificar status
+                orderNumberInput.addEventListener('change', async function() {
+                    const orderNumber = this.value.trim();
+                    if (orderNumber) {
+                        const status = await checkSetupStatus(cellName, orderNumber);
+                        updateSetupStatusDisplay(status);
+                        
+                        // Guardar o número da ordem para usar posteriormente
+                        window.currentOrderNumber = orderNumber;
+                    } else {
+                        setupTypeStatus.style.display = 'none';
+                    }
+                });
+                
+                // Configurar eventos para os botões de tipo
+                setupTypeRemovalBtn.addEventListener('click', function() {
+                    if (this.disabled) return;
+                    
+                    // Configurar formulário para Retirada
+                    setupTypeInput.value = 'removal';
+                    setupTypeTitle.textContent = 'Retirada de Material';
+                    operatorLabel.textContent = 'Operador da Retirada';
+                    verificationLabel.textContent = 'Confirmo que verifiquei e retirei todos os materiais necessários';
+                    
+                    // Se temos um número de ordem já digitado, preencher o campo
+                    if (window.currentOrderNumber) {
+                        document.getElementById('orderNumber').value = window.currentOrderNumber;
+                    }
+                    
+                    // Mostrar formulário e esconder seleção
+                    setupTypeSelectionContainer.style.display = 'none';
+                    setupFormContainer.style.display = 'block';
+                });
+                
+                setupTypeSupplyBtn.addEventListener('click', function() {
+                    if (this.disabled) return;
+                    
+                    // Configurar formulário para Abastecimento
+                    setupTypeInput.value = 'supply';
+                    setupTypeTitle.textContent = 'Abastecimento de Material';
+                    operatorLabel.textContent = 'Abastecedor';
+                    verificationLabel.textContent = 'Confirmo que verifiquei e abasteci todos os materiais necessários';
+                    
+                    // Se temos um número de ordem já digitado, preencher o campo
+                    if (window.currentOrderNumber) {
+                        document.getElementById('orderNumber').value = window.currentOrderNumber;
+                    }
+                    
+                    // Mostrar formulário e esconder seleção
+                    setupTypeSelectionContainer.style.display = 'none';
+                    setupFormContainer.style.display = 'block';
+                });
+            }
+            
+            // Setup file input and preview handling
+            if (photoInput) {
+                photoInput.addEventListener('change', async function() {
+                    const file = this.files[0];
+                    if (file) {
+                        // Criar uma imagem temporária para redimensionamento
+                        const img = new Image();
+                        const reader = new FileReader();
+                        
+                        reader.onload = function(e) {
+                            img.src = e.target.result;
+                        }
+                        
+                        img.onload = function() {
+                            // Criar canvas para redimensionamento
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 800;
+                            const MAX_HEIGHT = 800;
+                            
+                            let width = img.width;
+                            let height = img.height;
+                            
+                            // Calcular proporções
+                            if (width > height) {
+                                if (width > MAX_WIDTH) {
+                                    height *= MAX_WIDTH / width;
+                                    width = MAX_WIDTH;
+                                }
+                            } else {
+                                if (height > MAX_HEIGHT) {
+                                    width *= MAX_HEIGHT / height;
+                                    height = MAX_HEIGHT;
+                                }
+                            }
+                            
+                            canvas.width = width;
+                            canvas.height = height;
+                            
+                            // Desenhar e comprimir
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            
+                            // Converter para JPEG com qualidade reduzida
+                            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                            
+                            // Atualizar preview e dados
+                            imagePreview.src = compressedDataUrl;
+                            imagePreview.style.display = 'block';
+                            photoData.value = compressedDataUrl;
+                            
+                            // Enable finalize button
+                            finalizeButton.disabled = false;
+                        }
+                        
+                        reader.readAsDataURL(file);
+                    }
+                });
+            }
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/product-selection.js') }}"></script>
+    <script src="{{ url_for("static", filename="js/setup-products.js") }}"></script>
+</html>
+
+    <!-- Modal de Reset de Fluxo da Célula -->
+    <div class="modal fade" id="resetCellModal" tabindex="-1" aria-labelledby="resetCellModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title" id="resetCellModalLabel">
+                        <i class="fa fa-refresh me-2"></i> Resetar Fluxo da Célula
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="alert alert-warning">
+                        <i class="fa fa-exclamation-triangle me-2"></i>
+                        <strong>Atenção!</strong> Esta operação irá resetar o fluxo da célula, permitindo tanto retirada quanto abastecimento.
+                    </p>
+                    
+                    <p>Célula: <strong id="resetCellName"></strong></p>
+                    
+                    <div class="mb-3">
+                        <label for="resetReason" class="form-label">Motivo do Reset (obrigatório)</label>
+                        <textarea class="form-control" id="resetReason" rows="3" required></textarea>
+                        <div class="invalid-feedback">
+                            Por favor, informe o motivo do reset da célula.
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-warning" id="confirmResetBtn">
+                        <i class="fa fa-refresh me-2"></i> Confirmar Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>

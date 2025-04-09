@@ -1,0 +1,11 @@
+                                {% if user_profile == 'auditor' %}
+                                    <a href="{{ url_for('audit') }}" class="btn btn-info main-btn me-md-2 mb-2">
+                                        <i class="fa fa-search me-2"></i> Auditar
+                                    </a>
+                                    <a href="{{ url_for('register_qrcode') }}" class="btn btn-secondary main-btn me-md-2 mb-2">
+                                        <i class="fa fa-qrcode me-2"></i> Cadastrar Novo QR Code
+                                    </a>
+                                    <a href="{{ url_for('product_management') }}" class="btn btn-success main-btn me-md-2 mb-2">
+                                        <i class="fa fa-cubes me-2"></i> Gerenciar Produtos
+                                    </a>
+                                {% endif %}

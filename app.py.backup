@@ -1,0 +1,1182 @@
+import os
+import json
+import logging
+import datetime
+import base64
+from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
+from flask import (
+    Flask, render_template, request, redirect, 
+    url_for, session, flash, jsonify, send_from_directory
+)
+
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("SESSION_SECRET", "setup_tracking_secret_key")
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
+app.debug = True
+
+
+# Ensure necessary directories exist
+def ensure_dir(directory):
+    """Create directory if it doesn't exist."""
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+# Root data directory
+DATA_DIR = "dados_setup"
+ensure_dir(DATA_DIR)
+
+# Initialize users.json and qrcodes.json if they don't exist
+def init_data_files():
+    """Initialize data files if they don't exist."""
+    users_file = os.path.join(DATA_DIR, "users.json")
+    qrcodes_file = os.path.join(DATA_DIR, "qrcodes.json")
+    
+    # Create users.json with a default admin user if it doesn't exist
+    if not os.path.exists(users_file):
+        with open(users_file, 'w') as f:
+            # Alterado para hash mais simples para fins de demonstração
+            json.dump([{
+                "username": "admin",
+                "password": generate_password_hash("admin123")
+            }], f)
+    else:
+        # Tentar reconstruir o arquivo users.json para garantir que a senha funcione
+        try:
+            logging.debug("Tentando recriar o usuário admin")
+            with open(users_file, 'r') as f:
+                users = json.load(f)
+            
+            # Atualizar a senha do admin, se existir
+            for user in users:
+                if user['username'] == 'admin':
+                    user['password'] = generate_password_hash("admin123")
+                    logging.debug("Senha do admin atualizada")
+                    break
+            
+            # Se não houver admin, criar um
+            if not any(user['username'] == 'admin' for user in users):
+                users.append({
+                    "username": "admin",
+                    "password": generate_password_hash("admin123")
+                })
+                logging.debug("Novo usuário admin criado")
+            
+            # Salvar arquivo atualizado
+            with open(users_file, 'w') as f:
+                json.dump(users, f)
+        except Exception as e:
+            logging.error(f"Erro ao atualizar users.json: {e}")
+    
+    # Create qrcodes.json if it doesn't exist
+    if not os.path.exists(qrcodes_file):
+        with open(qrcodes_file, 'w') as f:
+            json.dump({}, f)
+
+init_data_files()
+
+def get_users():
+    """Get all users from users.json."""
+    try:
+        with open(os.path.join(DATA_DIR, "users.json"), 'r') as f:
+            users_list = json.load(f)
+            # Converter lista para dicionário para facilitar a manipulação
+            users_dict = {}
+            for user in users_list:
+                username = user.get('username')
+                if username:
+                    users_dict[username] = {
+                        'password': user.get('password'),
+                        'last_updated': user.get('last_updated', ''),
+                        'profile': user.get('profile', 'auditor')  # Por padrão, usuários existentes serão auditores
+                    }
+            return users_dict
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logging.error(f"Error loading users: {e}")
+        return {}
+        
+def save_users(users_dict):
+    """Save users dictionary to users.json in list format."""
+    users_list = []
+    for username, data in users_dict.items():
+        user_entry = {
+            'username': username,
+            'password': data.get('password'),
+            'profile': data.get('profile', 'auditor')
+        }
+        if 'last_updated' in data:
+            user_entry['last_updated'] = data['last_updated']
+        users_list.append(user_entry)
+    
+    with open(os.path.join(DATA_DIR, "users.json"), 'w') as f:
+        json.dump(users_list, f)
+        
+def add_user(username, password, profile='auditor'):
+    """Add a new user or update existing user.
+    
+    Args:
+        username: Nome do usuário
+        password: Senha do usuário
+        profile: Perfil do usuário ('auditor' ou 'supplier')
+    """
+    users = get_users()
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Garantir que o perfil seja válido
+    if profile not in ['auditor', 'supplier']:
+        profile = 'auditor'
+    
+    # Garantir que o primeiro usuário 'admin' seja sempre auditor
+    if username == 'admin':
+        profile = 'auditor'
+    
+    # Adicionar novo usuário ou atualizar existente
+    users[username] = {
+        'password': generate_password_hash(password),
+        'last_updated': timestamp,
+        'profile': profile
+    }
+    
+    save_users(users)
+    return True
+    
+def delete_user(username):
+    """Delete a user."""
+    users = get_users()
+    if username in users:
+        # Não permitir excluir o último usuário
+        if len(users) <= 1:
+            return False
+        
+        # Não permitir excluir o usuário 'admin'
+        if username == 'admin':
+            return False
+            
+        del users[username]
+        save_users(users)
+        return True
+    return False
+    
+def authenticate_user(username, password):
+    """Authenticate a user with username and password."""
+    users = get_users()
+    if username in users:
+        stored_hash = users[username]['password']
+        return check_password_hash(stored_hash, password)
+    return False
+
+def get_qrcodes():
+    """Get all QR codes from qrcodes.json."""
+    try:
+        with open(os.path.join(DATA_DIR, "qrcodes.json"), 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logging.error(f"Error loading QR codes: {e}")
+        return {}
+
+def save_qrcode(qrcode_value, cell_name):
+    """Save a new QR code and cell name mapping."""
+    qrcodes = get_qrcodes()
+    qrcodes[qrcode_value] = cell_name
+    
+    with open(os.path.join(DATA_DIR, "qrcodes.json"), 'w') as f:
+        json.dump(qrcodes, f)
+
+def get_cell_name(qrcode_value):
+    """Get the cell name associated with a QR code."""
+    qrcodes = get_qrcodes()
+    return qrcodes.get(qrcode_value)
+
+def save_setup(cell_name, order_number, supplier_name, photo_data, observation, verification_check, setup_type="supply"):
+    """Save setup data to a text file and the photo as an image file.
+    
+    Args:
+        cell_name: Nome da célula de produção
+        order_number: Número da ordem de produção
+        supplier_name: Nome do abastecedor
+        photo_data: Dados da foto em base64 (string única ou lista de strings)
+        observation: Observações
+        verification_check: Se a verificação foi realizada
+        setup_type: Tipo de setup ('removal' para retirada, 'supply' para abastecimento)
+    """
+    # Create cell directory if it doesn't exist
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    ensure_dir(cell_dir)
+    
+    # Validar o tipo de setup
+    if setup_type not in ['removal', 'supply']:
+        setup_type = 'supply'  # Valor padrão se não for um dos tipos válidos
+    
+    # Criar um identificador único para o arquivo que inclui o tipo de setup
+    file_identifier = f"{order_number}_{setup_type}"
+    
+    # Save text data
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    data = {
+        "cell_name": cell_name,
+        "order_number": order_number,
+        "timestamp": timestamp,
+        "supplier_name": supplier_name,
+        "observation": observation,
+        "verification_check": verification_check,
+        "audited": False,
+        "auditor_name": "",
+        "setup_type": setup_type,
+        "images": []  # Array para armazenar múltiplas imagens
+    }
+    
+    text_file_path = os.path.join(cell_dir, f"{file_identifier}.txt")
+    with open(text_file_path, 'w') as f:
+        json.dump(data, f)
+    
+    # Criar diretório de imagens para este setup
+    images_dir = os.path.join(cell_dir, file_identifier)
+    ensure_dir(images_dir)
+    
+    # Save photos
+    if photo_data:
+        # Converter para lista se for string única
+        if isinstance(photo_data, str):
+            photo_data_list = [photo_data]
+        elif isinstance(photo_data, list):
+            photo_data_list = photo_data
+        else:
+            photo_data_list = []
+            
+        for index, photo_item in enumerate(photo_data_list):
+            # Remove the "data:image/jpeg;base64," part
+            if "base64," in photo_item:
+                photo_item = photo_item.split("base64,")[1]
+                
+            try:
+                # Decode photo data
+                photo_bytes = base64.b64decode(photo_item)
+                photo_filename = f"image_{index+1}.jpg"
+                photo_path = os.path.join(images_dir, photo_filename)
+                
+                # Processar imagem para reduzir tamanho
+                from PIL import Image
+                from io import BytesIO
+                
+                # Abrir a imagem
+                img = Image.open(BytesIO(photo_bytes))
+                
+                # Converter para RGB se estiver em outro formato
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                    
+                # Redimensionar para tamanho máximo
+                max_size = (1200, 1200)
+                img.thumbnail(max_size, Image.LANCZOS)
+                
+                # Salvar com compressão
+                img.save(photo_path, format='JPEG', optimize=True, quality=85)
+                
+                # Adicionar informação da imagem ao array de imagens
+                data["images"].append({
+                    "filename": photo_filename,
+                    "path": os.path.join(file_identifier, photo_filename)
+                })
+                    
+            except Exception as e:
+                logging.error(f"Error saving photo {index+1}: {e}")
+                # Continuar mesmo se houver erro na foto
+        
+        # Definir que tem imagem se pelo menos uma foi salva com sucesso
+        data["has_image"] = len(data["images"]) > 0
+        
+        # Atualizar o arquivo de dados para incluir informações das imagens
+        with open(text_file_path, 'w') as f:
+            json.dump(data, f)
+                
+    else:
+        # Se não houver dados de imagem
+        data["has_image"] = False
+        
+        # Atualizar o arquivo de dados
+        with open(text_file_path, 'w') as f:
+            json.dump(data, f)
+
+def get_all_setups():
+    """Get all setup data organized by cells."""
+    cells = {}
+    
+    # Iterate through cell directories
+    for item in os.listdir(DATA_DIR):
+        cell_dir = os.path.join(DATA_DIR, item)
+        if os.path.isdir(cell_dir) and item not in ["__pycache__"]:
+            cells[item] = []
+            
+            # Iterate through text files in each cell directory
+            for file in os.listdir(cell_dir):
+                if file.endswith(".txt"):
+                    # O nome do arquivo agora inclui o tipo de setup (order_number_setup_type.txt)
+                    file_basename = file.split(".")[0]
+                    
+                    # Verificar se o arquivo segue o novo formato (com tipo de setup)
+                    if "_" in file_basename:
+                        order_number, setup_type = file_basename.rsplit("_", 1)
+                    else:
+                        # Compatibilidade com arquivos antigos (sem tipo de setup)
+                        order_number = file_basename
+                        setup_type = "supply"  # Assumir que setups antigos são do tipo abastecimento
+                    
+                    txt_path = os.path.join(cell_dir, file)
+                    
+                    # Load setup data from text file
+                    try:
+                        with open(txt_path, 'r') as f:
+                            setup_data = json.load(f)
+                        
+                        # Adicionar tipo de setup se não existir no dado carregado
+                        if "setup_type" not in setup_data:
+                            setup_data["setup_type"] = setup_type
+                        
+                        # Garantir que file_identifier está disponível para referência posterior
+                        setup_data["file_identifier"] = file_basename
+                        
+                        # Verificar imagens no novo formato (múltiplas imagens)
+                        if "images" in setup_data and isinstance(setup_data["images"], list) and len(setup_data["images"]) > 0:
+                            # Novo formato com múltiplas imagens
+                            setup_data["has_image"] = True
+                            # Garantir que a primeira imagem é a principal para compatibilidade
+                            setup_data["main_image"] = setup_data["images"][0]["path"] if setup_data["images"] else ""
+                        else:
+                            # Verificar formato antigo (imagem única)
+                            img_path = os.path.join(cell_dir, f"{file_basename}.jpg")
+                            if os.path.exists(img_path):
+                                setup_data["has_image"] = True
+                                # Converter formato antigo para o novo
+                                setup_data["images"] = [{
+                                    "filename": f"{file_basename}.jpg",
+                                    "path": f"{file_basename}.jpg"
+                                }]
+                                setup_data["main_image"] = f"{file_basename}.jpg"
+                            else:
+                                # Verificar pasta de imagens
+                                images_dir = os.path.join(cell_dir, file_basename)
+                                if os.path.isdir(images_dir):
+                                    # Procurar por imagens na pasta
+                                    image_files = [f for f in os.listdir(images_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+                                    if image_files:
+                                        setup_data["has_image"] = True
+                                        setup_data["images"] = []
+                                        for img_file in image_files:
+                                            setup_data["images"].append({
+                                                "filename": img_file,
+                                                "path": os.path.join(file_basename, img_file)
+                                            })
+                                        setup_data["main_image"] = os.path.join(file_basename, image_files[0])
+                                    else:
+                                        setup_data["has_image"] = False
+                                        setup_data["images"] = []
+                                else:
+                                    setup_data["has_image"] = False
+                                    setup_data["images"] = []
+                        
+                        cells[item].append(setup_data)
+                    except (json.JSONDecodeError, FileNotFoundError) as e:
+                        logging.error(f"Error loading setup data from {txt_path}: {e}")
+    
+    return cells
+
+def update_setup(cell_name, order_number, supplier_name, observation, verification_check, audited=None, auditor_name=None, setup_type=None, photo_data=None, timestamp=None, audit_notes=None):
+    """Update an existing setup data file."""
+    # Para compatibilidade, tentamos primeiro o formato novo, depois o formato antigo
+    
+    # Se temos um tipo de setup específico, vamos usar esse conhecimento
+    if setup_type:
+        file_identifier = f"{order_number}_{setup_type}"
+        text_file_path = os.path.join(DATA_DIR, cell_name, f"{file_identifier}.txt")
+    else:
+        # Se não temos o tipo, vamos procurar arquivos com esse order_number
+        cell_dir = os.path.join(DATA_DIR, cell_name)
+        matching_files = []
+        
+        if os.path.isdir(cell_dir):
+            for file in os.listdir(cell_dir):
+                if file.endswith(".txt") and file.startswith(f"{order_number}"):
+                    matching_files.append(file)
+        
+        if not matching_files:
+            logging.error(f"Nenhum arquivo encontrado para order_number={order_number} na célula {cell_name}")
+            return False
+        
+        # Usar o primeiro arquivo encontrado
+        text_file_path = os.path.join(cell_dir, matching_files[0])
+    
+    try:
+        with open(text_file_path, 'r') as f:
+            data = json.load(f)
+        
+        # Update fields
+        data["supplier_name"] = supplier_name if supplier_name is not None else data.get("supplier_name", "")
+        data["observation"] = observation
+        data["verification_check"] = verification_check
+        
+        # Atualizar o timestamp se fornecido
+        if timestamp:
+            data["timestamp"] = timestamp
+        
+        # Update audit fields if provided
+        if audited is not None:
+            data["audited"] = audited
+            # Se estiver marcando como auditado, definir timestamp da auditoria
+            if audited and not data.get("audit_timestamp"):
+                data["audit_timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        if auditor_name is not None:
+            data["auditor_name"] = auditor_name
+            
+        # Adicionar anotações de auditoria, se fornecidas
+        if audit_notes is not None:
+            data["audit_notes"] = audit_notes
+        
+        # Garantir que o setup_type está definido
+        if setup_type and "setup_type" not in data:
+            data["setup_type"] = setup_type
+        
+        # Atualizar a foto se fornecida
+        if photo_data:
+            cell_dir = os.path.join(DATA_DIR, cell_name)
+            file_identifier = f"{order_number}_{data.get('setup_type', 'supply')}"
+            
+            # Criar diretório de imagens para este setup, se não existir
+            images_dir = os.path.join(cell_dir, file_identifier)
+            ensure_dir(images_dir)
+            
+            # Verificar se photo_data é uma string única ou uma lista
+            if isinstance(photo_data, str):
+                photo_data_list = [photo_data]
+            elif isinstance(photo_data, list):
+                photo_data_list = photo_data
+            else:
+                photo_data_list = []
+            
+            # Inicializar array de imagens se não existir
+            if "images" not in data:
+                data["images"] = []
+                
+            # Para cada imagem
+            for index, photo_item in enumerate(photo_data_list):
+                # Remove the "data:image/jpeg;base64," part
+                if "base64," in photo_item:
+                    photo_item = photo_item.split("base64,")[1]
+                    
+                try:
+                    # Decode photo data
+                    photo_bytes = base64.b64decode(photo_item)
+                    photo_filename = f"image_{len(data['images']) + index + 1}.jpg"
+                    photo_path = os.path.join(images_dir, photo_filename)
+                    
+                    # Processar imagem para reduzir tamanho
+                    from PIL import Image
+                    from io import BytesIO
+                    
+                    # Abrir a imagem a partir dos bytes
+                    img = Image.open(BytesIO(photo_bytes))
+                    
+                    # Converter para RGB se estiver em modo P (palette) ou outros modos
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # Redimensionar se a imagem for muito grande
+                    max_size = (1200, 1200)
+                    img.thumbnail(max_size, Image.LANCZOS)
+                    
+                    # Salvar com qualidade reduzida
+                    img.save(photo_path, format='JPEG', optimize=True, quality=85)
+                    
+                    # Adicionar informação da imagem ao array de imagens
+                    data["images"].append({
+                        "filename": photo_filename,
+                        "path": os.path.join(file_identifier, photo_filename)
+                    })
+                    
+                except Exception as e:
+                    logging.error(f"Error saving photo {index+1}: {e}")
+                    # Não falhar completamente só por causa da foto
+            
+            # Definir que tem imagem se pelo menos uma foi salva com sucesso
+            data["has_image"] = len(data["images"]) > 0
+            
+            # Garantir que main_image está definido
+            if data["has_image"] and not data.get("main_image") and data["images"]:
+                data["main_image"] = data["images"][0]["path"]
+                
+            # Converter formato antigo para novo, se necessário
+            img_path = os.path.join(cell_dir, f"{file_identifier}.jpg")
+            if os.path.exists(img_path) and not data["images"]:
+                try:
+                    # Mover a imagem antiga para o novo formato
+                    photo_filename = "image_1.jpg"
+                    new_path = os.path.join(images_dir, photo_filename)
+                    
+                    # Usar PIL para ler e salvar a imagem
+                    img = Image.open(img_path)
+                    img.save(new_path, format='JPEG', optimize=True, quality=85)
+                    
+                    # Adicionar informação da imagem ao array de imagens
+                    data["images"].append({
+                        "filename": photo_filename,
+                        "path": os.path.join(file_identifier, photo_filename)
+                    })
+                    
+                    data["main_image"] = os.path.join(file_identifier, photo_filename)
+                    
+                    # Opcionalmente, remover o arquivo antigo
+                    os.remove(img_path)
+                except Exception as e:
+                    logging.error(f"Error converting old image format: {e}")
+                    # Não falhar completamente por causa da conversão
+        
+        with open(text_file_path, 'w') as f:
+            json.dump(data, f)
+            
+        return True
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logging.error(f"Error updating setup: {e}")
+        return False
+
+@app.route('/')
+def index():
+    """Render the home page."""
+    username = session.get('username')
+    user_profile = 'visitor'  # Default perfil para não logados
+    
+    if username:
+        users = get_users()
+        user_profile = users.get(username, {}).get('profile', 'visitor')
+    
+    return render_template('index.html', user_profile=user_profile)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Handle user login."""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        logging.debug(f"Login attempt: username={username}")
+        
+        if authenticate_user(username, password):
+            logging.debug(f"Login successful for user: {username}")
+            session['logged_in'] = True
+            session['username'] = username
+            
+            # Add debug flash message for successful login
+            flash(f'Login bem-sucedido como {username}', 'success')
+            
+            next_page = request.args.get('next') or url_for('index')
+            logging.debug(f"Redirecting to: {next_page}")
+            return redirect(next_page)
+        else:
+            # Log login failure
+            logging.debug(f"Login failed for user: {username}")
+            flash('Usuário ou senha inválidos', 'danger')
+    
+    return render_template('login.html')
+
+@app.route('/cadastro_usuarios', methods=['GET', 'POST'])
+def cadastro_usuarios():
+    """Gerenciar usuários do sistema."""
+    # Verificar se o usuário está logado
+    if not session.get('logged_in'):
+        return redirect(url_for('login', next=request.path))
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        flash('Acesso restrito. Apenas auditores podem acessar esta página.', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'add':
+            # Adicionar novo usuário
+            username = request.form.get('username')
+            password = request.form.get('password')
+            profile = request.form.get('profile', 'auditor')  # Valor padrão é auditor
+            
+            if not username or not password:
+                flash('Usuário e senha são obrigatórios', 'danger')
+                return redirect(url_for('cadastro_usuarios'))
+            
+            # Verificar se o usuário já existe
+            users = get_users()
+            if username in users:
+                flash(f'Usuário {username} já existe', 'warning')
+            else:
+                add_user(username, password, profile)
+                flash(f'Usuário {username} adicionado com sucesso', 'success')
+                
+        elif action == 'edit':
+            # Editar usuário existente (senha e perfil)
+            username = request.form.get('username')
+            new_password = request.form.get('new_password')
+            profile = request.form.get('edit_profile')  # Novo campo para o perfil na edição
+            
+            if not username or not new_password:
+                flash('Nome de usuário e nova senha são obrigatórios', 'danger')
+                return redirect(url_for('cadastro_usuarios'))
+            
+            # Se não foi enviado um perfil, manter o perfil atual
+            if not profile:
+                users = get_users()
+                if username in users:
+                    profile = users[username].get('profile', 'auditor')
+            
+            add_user(username, new_password, profile)
+            flash(f'Usuário {username} atualizado com sucesso', 'success')
+            
+        elif action == 'delete':
+            # Excluir usuário
+            username = request.form.get('username')
+            
+            # Não permitir excluir o próprio usuário
+            if username == session.get('username'):
+                flash('Você não pode excluir seu próprio usuário', 'danger')
+                return redirect(url_for('cadastro_usuarios'))
+            
+            if delete_user(username):
+                flash(f'Usuário {username} excluído com sucesso', 'success')
+            else:
+                flash(f'Não foi possível excluir o usuário {username}', 'danger')
+    
+    # Obter lista atualizada de usuários
+    users = get_users()
+    return render_template('user_management.html', users=users)
+
+@app.route('/logout')
+def logout():
+    """Handle user logout."""
+    session.pop('logged_in', None)
+    session.pop('username', None)
+    flash('You have been logged out', 'success')
+    return redirect(url_for('index'))
+
+@app.route('/setup', methods=['GET', 'POST'])
+def setup():
+    """Handle setup registration."""
+    # Verificar se o usuário está logado
+    if not session.get('logged_in'):
+        return redirect(url_for('login', next=request.path))
+        
+    # Obter o nome de usuário e perfil
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if request.method == 'POST':
+        cell_name = request.form.get('cell_name')
+        order_number = request.form.get('order_number')
+        # Se for abastecedor, usar o nome do usuário logado
+        if user_profile == 'supplier':
+            supplier_name = username
+        else:
+            supplier_name = request.form.get('supplier_name')
+            
+        photo_data_json = request.form.get('photo_data')
+        observation = request.form.get('observation', '')
+        verification_check = 'verification_check' in request.form
+        setup_type = request.form.get('setup_type', 'supply')  # Valor padrão é 'supply' se não for fornecido
+        
+        # Validate required fields
+        required_fields = [cell_name, order_number, photo_data_json]
+        if user_profile != 'supplier':  # Se não for abastecedor, o campo supplier_name é obrigatório
+            required_fields.append(supplier_name)
+            
+        if not all(required_fields):
+            flash('Todos os campos obrigatórios devem ser preenchidos', 'danger')
+            return redirect(url_for('setup'))
+        
+        # Converter string JSON para lista de imagens, se for JSON
+        try:
+            if photo_data_json.startswith('[') and photo_data_json.endswith(']'):
+                photo_data = json.loads(photo_data_json)
+            else:
+                # Se não for JSON, tratar como string única (formato antigo)
+                photo_data = photo_data_json
+        except json.JSONDecodeError:
+            # Se houve erro no parsing JSON, usar o texto original
+            photo_data = photo_data_json
+        
+        # Save setup data com tipo específico
+        save_setup(cell_name, order_number, supplier_name, photo_data, observation, verification_check, setup_type)
+        
+        # Mensagem de sucesso específica para o tipo de setup
+        if setup_type == 'removal':
+            flash('Retirada de material registrada com sucesso!', 'success')
+        else:
+            flash('Abastecimento de material registrado com sucesso!', 'success')
+            
+        return redirect(url_for('index'))
+    
+    qrcode = request.args.get('qrcode')
+    cell_name = get_cell_name(qrcode) if qrcode else None
+    
+    return render_template('setup.html', qrcode=qrcode, cell_name=cell_name, 
+                          user_profile=user_profile, username=username)
+
+@app.route('/api/check_setup_status')
+def check_setup_status():
+    """API para verificar o status dos setups para uma célula e ordem de produção específica.
+    
+    Verifica se já existem registros de retirada e abastecimento para a ordem.
+    """
+    cell_name = request.args.get('cell_name')
+    order_number = request.args.get('order_number')
+    
+    if not all([cell_name, order_number]):
+        return jsonify({
+            "success": False,
+            "message": "Célula e número de ordem são obrigatórios",
+            "has_removal": False,
+            "has_supply": False
+        }), 400
+    
+    # Verificar arquivos para a ordem na célula
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    has_removal = False
+    has_supply = False
+    
+    if os.path.isdir(cell_dir):
+        for file in os.listdir(cell_dir):
+            if file.endswith(".txt") and file.startswith(f"{order_number}_"):
+                file_path = os.path.join(cell_dir, file)
+                try:
+                    with open(file_path, 'r') as f:
+                        data = json.load(f)
+                    
+                    setup_type = data.get('setup_type', '')
+                    if setup_type == 'removal':
+                        has_removal = True
+                    elif setup_type == 'supply':
+                        has_supply = True
+                except:
+                    pass
+    
+    return jsonify({
+        "success": True,
+        "has_removal": has_removal,
+        "has_supply": has_supply,
+        "message": "Status verificado com sucesso"
+    })
+
+@app.route('/audit')
+def audit():
+    """Display the audit page."""
+    if not session.get('logged_in'):
+        return redirect(url_for('login', next=request.path))
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        flash('Acesso restrito. Apenas auditores podem acessar esta página.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Obter parâmetros de filtro
+    filter_date_start = request.args.get('filter_date_start', '')
+    filter_date_end = request.args.get('filter_date_end', '')
+    filter_auditor = request.args.get('filter_auditor', '')
+    filter_audited = request.args.get('filter_audited', '')
+    filter_order = request.args.get('filter_order', '')
+    filter_cell = request.args.get('filter_cell', '')
+    filter_supplier = request.args.get('filter_supplier', '')
+    
+    # Obter todos os setups
+    cells = get_all_setups()
+    
+    # Aplicar filtros, mas manter a estrutura original para o template
+    if any([filter_date_start, filter_date_end, filter_auditor, filter_audited, filter_order, filter_cell, filter_supplier]):
+        filtered_cells = {}
+        
+        for cell_name, setups in cells.items():
+            # Filtrar por nome da célula
+            if filter_cell and filter_cell.lower() not in cell_name.lower():
+                continue
+                
+            filtered_setups = []
+            for setup in setups:
+                # Filtrar por período de datas
+                setup_date = setup.get('timestamp', '').split(' ')[0]  # Extrair apenas a parte da data (YYYY-MM-DD)
+                
+                # Se data inicial está especificada e a data do setup é anterior
+                if filter_date_start and setup_date < filter_date_start:
+                    continue
+                    
+                # Se data final está especificada e a data do setup é posterior
+                if filter_date_end and setup_date > filter_date_end:
+                    continue
+                    
+                # Filtrar por auditor
+                if filter_auditor and filter_auditor.lower() not in setup.get('auditor_name', '').lower():
+                    continue
+                    
+                # Filtrar por abastecedor (novo)
+                if filter_supplier and filter_supplier.lower() not in setup.get('supplier_name', '').lower():
+                    continue
+                    
+                # Filtrar por status de auditoria
+                if filter_audited:
+                    is_audited = setup.get('audited', False)
+                    if (filter_audited == 'sim' and not is_audited) or (filter_audited == 'nao' and is_audited):
+                        continue
+                
+                # Filtrar por ordem de produção
+                if filter_order and filter_order.lower() not in setup.get('order_number', '').lower():
+                    continue
+                    
+                filtered_setups.append(setup)
+                
+            if filtered_setups:
+                filtered_cells[cell_name] = filtered_setups
+                
+        cells = filtered_cells
+    
+    return render_template('audit.html', cells=cells)
+
+@app.route('/register_qrcode', methods=['GET', 'POST'])
+def register_qrcode():
+    """Handle QR code registration."""
+    if not session.get('logged_in'):
+        return redirect(url_for('login', next=request.path))
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        flash('Acesso restrito. Apenas auditores podem acessar esta página.', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        qrcode_value = request.form.get('qrcode_value')
+        cell_name = request.form.get('cell_name')
+        
+        if not all([qrcode_value, cell_name]):
+            flash('QR Code e nome da célula são obrigatórios', 'danger')
+            return redirect(url_for('register_qrcode'))
+        
+        save_qrcode(qrcode_value, cell_name)
+        flash('QR Code cadastrado com sucesso!', 'success')
+        return redirect(url_for('index'))
+    
+    return render_template('register_qrcode.html')
+
+@app.route('/api/get_cell_name/<qrcode>')
+def api_get_cell_name(qrcode):
+    """API endpoint to get cell name from QR code."""
+    cell_name = get_cell_name(qrcode)
+    if cell_name:
+        # Verificar o status dos setups para esta célula
+        cell_dir = os.path.join(DATA_DIR, cell_name)
+        setup_status = {
+            "removal": False,  # Se já tem um registro de limpeza
+            "supply": False    # Se já tem um registro de abastecimento
+        }
+        
+        # Verificar quais tipos de setup já foram registrados para esta célula
+        most_recent_order = None
+        
+        if os.path.isdir(cell_dir):
+            file_list = []
+            
+            # Coletar todos os arquivos de setup
+            for file in os.listdir(cell_dir):
+                if file.endswith(".txt"):
+                    file_list.append(file)
+            
+            # Ordenar arquivos por data de modificação (do mais recente ao mais antigo)
+            if file_list:
+                file_list.sort(key=lambda x: os.path.getmtime(os.path.join(cell_dir, x)), reverse=True)
+                
+                # Pegar os arquivos mais recentes para verificar
+                for file in file_list:
+                    # Verificar se o arquivo segue o formato com tipo de setup
+                    file_basename = file.split(".")[0]
+                    
+                    if "_" in file_basename:
+                        order_number, setup_type = file_basename.rsplit("_", 1)
+                        
+                        # Se já encontramos o order_number mais recente
+                        if most_recent_order and order_number != most_recent_order:
+                            continue
+                            
+                        # Definir o order_number mais recente na primeira iteração
+                        if most_recent_order is None:
+                            most_recent_order = order_number
+                            
+                        # Marcar o tipo de setup encontrado
+                        if setup_type in ['removal', 'supply']:
+                            setup_status[setup_type] = True
+                
+                # Se ambos os tipos já estão marcados como True, significa que o ciclo está completo
+                # Neste caso, resetamos para permitir um novo ciclo
+                if setup_status['removal'] and setup_status['supply']:
+                    setup_status['removal'] = False
+                    setup_status['supply'] = False
+                    
+                    # Nova ordem para o próximo ciclo
+                    most_recent_order = str(int(most_recent_order) + 1) if most_recent_order and most_recent_order.isdigit() else None
+                
+        return jsonify({
+            "success": True, 
+            "cell_name": cell_name,
+            "setup_status": setup_status,
+            "most_recent_order": most_recent_order
+        })
+    return jsonify({"success": False, "message": "QR Code não encontrado"}), 404
+
+@app.route('/api/update_setup', methods=['POST'])
+def api_update_setup():
+    """API endpoint to update setup data."""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    data = request.json
+    success = update_setup(
+        data.get('cell_name'),
+        data.get('order_number'),
+        data.get('supplier_name'),
+        data.get('observation', ''),
+        data.get('verification_check', False),
+        data.get('audited'),
+        data.get('auditor_name'),
+        data.get('setup_type'),
+        data.get('photo_data'),
+        data.get('timestamp')
+    )
+    
+    if success:
+        return jsonify({"success": True})
+    return jsonify({"success": False, "message": "Erro ao atualizar setup"}), 500
+
+@app.route('/api/mark_as_audited', methods=['POST'])
+def api_mark_as_audited():
+    """API endpoint to mark or unmark a setup as audited."""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    data = request.json
+    auditor_name = session.get('username')
+    
+    # Verificar se é para marcar ou desmarcar
+    is_mark_action = data.get('is_mark', True)
+    audit_notes = data.get('audit_notes', '')
+    
+    # Verificar se o usuário tem perfil de auditor
+    users = get_users()
+    user_profile = users.get(auditor_name, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        return jsonify({"success": False, "message": "Somente auditores podem alterar o status de auditoria"}), 403
+    
+    # Se for para desmarcar, definimos como False e limpamos o nome do auditor
+    if not is_mark_action:
+        success = update_setup(
+            data.get('cell_name'),
+            data.get('order_number'),
+            data.get('supplier_name', ''),
+            data.get('observation', ''),
+            data.get('verification_check', False),
+            False,  # Desmarcar a auditoria
+            '',     # Limpar o nome do auditor
+            data.get('setup_type'),
+            None,   # Sem mudança na foto
+            None,   # Sem mudança no timestamp
+            ''      # Limpar anotações de auditoria
+        )
+        if success:
+            return jsonify({"success": True, "audited": False, "auditor_name": "", "audit_notes": ""})
+    # Caso contrário, marcamos como auditado normalmente
+    else:
+        success = update_setup(
+            data.get('cell_name'),
+            data.get('order_number'),
+            data.get('supplier_name', ''),
+            data.get('observation', ''),
+            data.get('verification_check', False),
+            True,  # Marcar como auditado
+            auditor_name,
+            data.get('setup_type'),
+            None,  # Sem mudança na foto
+            None,  # Sem mudança no timestamp
+            audit_notes  # Incluir anotações de auditoria
+        )
+        if success:
+            return jsonify({
+                "success": True, 
+                "audited": True, 
+                "auditor_name": auditor_name,
+                "audit_notes": audit_notes
+            })
+    
+    return jsonify({"success": False, "message": "Erro ao alterar status da auditoria"}), 500
+
+def delete_setup(cell_name, order_number, setup_type):
+    """Delete a setup entry and its related image."""
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    
+    if not os.path.isdir(cell_dir):
+        return False
+    
+    # Identificar os arquivos a serem excluídos
+    file_identifier = f"{order_number}_{setup_type}"
+    text_file_path = os.path.join(cell_dir, f"{file_identifier}.txt")
+    image_file_path = os.path.join(cell_dir, f"{file_identifier}.jpg")
+    
+    success = True
+    
+    # Excluir o arquivo de texto
+    if os.path.exists(text_file_path):
+        try:
+            os.remove(text_file_path)
+        except Exception as e:
+            logging.error(f"Erro ao excluir arquivo de texto: {e}")
+            success = False
+    else:
+        success = False
+    
+    # Excluir a imagem (se existir)
+    if os.path.exists(image_file_path):
+        try:
+            os.remove(image_file_path)
+        except Exception as e:
+            logging.error(f"Erro ao excluir imagem: {e}")
+            success = False
+    
+    return success
+
+@app.route('/api/delete_setup', methods=['POST'])
+def api_delete_setup():
+    """API endpoint to delete a setup entry."""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    # Verificar se o usuário tem perfil de auditor
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        return jsonify({"success": False, "message": "Somente auditores podem excluir registros"}), 403
+    
+    data = request.json
+    cell_name = data.get('cell_name')
+    order_number = data.get('order_number')
+    setup_type = data.get('setup_type')
+    
+    if not all([cell_name, order_number, setup_type]):
+        return jsonify({"success": False, "message": "Dados incompletos para exclusão"}), 400
+    
+    success = delete_setup(cell_name, order_number, setup_type)
+    
+    if success:
+        return jsonify({"success": True, "message": "Registro excluído com sucesso"})
+    else:
+        return jsonify({"success": False, "message": "Erro ao excluir o registro"}), 500
+
+@app.route('/photos/<cell_name>/<path:filepath>')
+def get_photo(cell_name, filepath):
+    """Serve setup photos, including from subdirectories.
+    
+    Args:
+        cell_name: Nome da célula
+        filepath: Caminho do arquivo, pode incluir subdiretórios
+    """
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    
+    # Se filepath contém um subdiretório
+    if '/' in filepath:
+        subdir, filename = filepath.rsplit('/', 1)
+        return send_from_directory(os.path.join(cell_dir, subdir), filename)
+    else:
+        # Compatibilidade com formato antigo
+        return send_from_directory(cell_dir, filepath)
+
+def reset_cell_flow(cell_name, reason):
+    """Reset the flow of a cell without deleting records.
+    
+    Args:
+        cell_name: Nome da célula para resetar o fluxo
+        reason: Motivo para o reset do fluxo
+    
+    Returns:
+        bool: True se o reset foi bem-sucedido, False caso contrário
+        str: Mensagem de status
+    """
+    if not cell_name or not reason:
+        return False, "Célula e motivo são obrigatórios"
+    
+    try:
+        # Criar arquivo de log com o reset
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cell_dir = os.path.join(DATA_DIR, cell_name)
+        ensure_dir(cell_dir)
+        
+        # Criar um arquivo de registro do reset
+        reset_log_file = os.path.join(cell_dir, f"reset_log_{timestamp.replace(' ', '_').replace(':', '-')}.txt")
+        reset_data = {
+            "cell_name": cell_name,
+            "reset_timestamp": timestamp,
+            "reset_reason": reason,
+            "reset_by": session.get("username", "Unknown")
+        }
+        
+        with open(reset_log_file, 'w') as f:
+            json.dump(reset_data, f)
+        
+        return True, "Fluxo da célula resetado com sucesso"
+    except Exception as e:
+        logging.error(f"Erro ao resetar o fluxo da célula: {e}")
+        return False, f"Erro ao resetar célula: {str(e)}"
+        
+@app.route("/api/reset_cell", methods=["POST"])
+def api_reset_cell():
+    """API endpoint to reset the flow of a cell."""
+    # Verificar se o usuário está logado
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    # Verificar se o usuário tem perfil de auditor
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        return jsonify({"success": False, "message": "Somente auditores podem resetar o fluxo da célula"}), 403
+    
+    data = request.json
+    cell_name = data.get('cell_name')
+    reset_reason = data.get('reset_reason')
+    
+    if not cell_name or not reset_reason:
+        return jsonify({"success": False, "message": "Célula e motivo são obrigatórios"}), 400
+    
+    success, message = reset_cell_flow(cell_name, reset_reason)
+    
+    if success:
+        return jsonify({"success": True, "message": message})
+    else:
+        return jsonify({"success": False, "message": message}), 500
+
+@app.route('/camera_test')
+def camera_test():
+    """Página de teste para verificar o acesso à câmera."""
+    return render_template('camera_test.html')
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

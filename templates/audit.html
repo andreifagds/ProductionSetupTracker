@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auditoria | Sistema de Setup de Células</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/custom-green-theme.css') }}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container main-container">
+        <!-- Header -->
+        <div class="app-header">
+            <h1 class="app-title">Auditoria de Setups</h1>
+            <p class="app-subtitle">Visualize e edite os setups cadastrados</p>
+        </div>
+
+        <!-- Back button -->
+        <div class="back-button">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                <i class="fa fa-arrow-left me-2"></i> Voltar
+            </a>
+        </div>
+
+        <!-- Alert Container for AJAX responses -->
+        <div id="alertContainer"></div>
+        
+        <!-- Modal para anotações de auditoria -->
+        <div class="modal fade" id="auditNotesModal" tabindex="-1" aria-labelledby="auditNotesModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content bg-dark text-light">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="auditNotesModalLabel">Anotações de Auditoria</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <form id="auditNotesForm">
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label for="auditNotes" class="form-label">Observações do auditor:</label>
+                                <textarea class="form-control bg-dark text-light" id="auditNotes" rows="4" placeholder="Exemplo: Precisei alterar a foto pois a imagem não estava boa, verifiquei os componentes manualmente, etc."></textarea>
+                                <small class="form-text text-muted">Estas anotações serão salvas junto com a auditoria.</small>
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="confirmPresence" required>
+                                <label class="form-check-label" for="confirmPresence">
+                                    Confirmo que estive presente na célula para realizar a auditoria
+                                </label>
+                                <div class="invalid-feedback">
+                                    Você deve confirmar sua presença na célula para realizar a auditoria.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Marcar como Auditado</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Botão de Filtro e Ações Rápidas -->
+        <div class="row mb-4">
+            <div class="col-12 d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#filterCollapse" aria-expanded="false" aria-controls="filterCollapse">
+                        <i class="fa fa-filter me-2"></i> Filtros
+                    </button>
+                </div>
+                {% if request.args|length > 0 %}
+                <div>
+                    <span class="badge bg-info">
+                        <i class="fa fa-info-circle me-1"></i> Filtros aplicados
+                    </span>
+                    <a href="{{ url_for('audit') }}" class="btn btn-sm btn-outline-secondary ms-2">
+                        <i class="fa fa-times me-1"></i> Limpar Filtros
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Filtros colapsáveis -->
+            <div class="col-12 collapse {% if request.args|length > 0 %}show{% endif %}" id="filterCollapse">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Filtros Avançados</h5>
+                    </div>
+                    <div class="card-body">
+                        <form action="{{ url_for('audit') }}" method="GET" class="row g-3">
+                            <!-- Período de Data -->
+                            <div class="col-md-6">
+                                <label class="form-label">Período</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fa fa-calendar"></i></span>
+                                    <input type="date" class="form-control" id="filter_date_start" name="filter_date_start" 
+                                           value="{{ request.args.get('filter_date_start', '') }}">
+                                    <span class="input-group-text">até</span>
+                                    <input type="date" class="form-control" id="filter_date_end" name="filter_date_end" 
+                                           value="{{ request.args.get('filter_date_end', '') }}">
+                                </div>
+                            </div>
+                            
+                            <!-- Status de Auditoria -->
+                            <div class="col-md-6">
+                                <label for="filter_audited" class="form-label">Status de Auditoria</label>
+                                <select class="form-select" id="filter_audited" name="filter_audited">
+                                    <option value="" {% if not request.args.get('filter_audited') %}selected{% endif %}>Todos</option>
+                                    <option value="sim" {% if request.args.get('filter_audited') == 'sim' %}selected{% endif %}>Auditados</option>
+                                    <option value="nao" {% if request.args.get('filter_audited') == 'nao' %}selected{% endif %}>Não Auditados</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Nome do Auditor -->
+                            <div class="col-md-4">
+                                <label for="filter_auditor" class="form-label">Nome do Auditor</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fa fa-user-circle"></i></span>
+                                    <input type="text" class="form-control" id="filter_auditor" name="filter_auditor" 
+                                           placeholder="Nome do auditor" value="{{ request.args.get('filter_auditor', '') }}">
+                                </div>
+                            </div>
+                            
+                            <!-- Nome do Abastecedor -->
+                            <div class="col-md-4">
+                                <label for="filter_supplier" class="form-label">Nome do Abastecedor</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fa fa-user"></i></span>
+                                    <input type="text" class="form-control" id="filter_supplier" name="filter_supplier" 
+                                           placeholder="Nome do abastecedor" value="{{ request.args.get('filter_supplier', '') }}">
+                                </div>
+                            </div>
+                            
+                            <!-- Ordem de Produção -->
+                            <div class="col-md-4">
+                                <label for="filter_order" class="form-label">Ordem de Produção</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fa fa-barcode"></i></span>
+                                    <input type="text" class="form-control" id="filter_order" name="filter_order" 
+                                           placeholder="Número da ordem" value="{{ request.args.get('filter_order', '') }}">
+                                </div>
+                            </div>
+                            
+                            <!-- Nome da Célula -->
+                            <div class="col-md-12">
+                                <label for="filter_cell" class="form-label">Nome da Célula</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fa fa-industry"></i></span>
+                                    <input type="text" class="form-control" id="filter_cell" name="filter_cell" 
+                                           placeholder="Nome da célula" value="{{ request.args.get('filter_cell', '') }}">
+                                </div>
+                            </div>
+                            
+                            <!-- Botões -->
+                            <div class="col-12 text-center mt-3">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa fa-search me-2"></i> Aplicar Filtros
+                                </button>
+                                <a href="{{ url_for('audit') }}" class="btn btn-secondary ms-2">
+                                    <i class="fa fa-refresh me-2"></i> Limpar Filtros
+                                </a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audit Content -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Setups Cadastrados</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if cells %}
+                            <div class="accordion" id="cellsAccordion">
+                                {% for cell_name, setups in cells.items() %}
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="heading{{ loop.index }}">
+                                            <button class="accordion-button {% if loop.index > 1 %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ loop.index }}" aria-expanded="{{ 'true' if loop.index == 1 else 'false' }}" aria-controls="collapse{{ loop.index }}">
+                                                <i class="fa fa-industry me-2"></i>
+                                                Célula: {{ cell_name }} ({{ setups|length }} registros)
+                                            </button>
+                                        </h2>
+                                        <div id="collapse{{ loop.index }}" class="accordion-collapse collapse {% if loop.index == 1 %}show{% endif %}" aria-labelledby="heading{{ loop.index }}" data-bs-parent="#cellsAccordion">
+                                            <div class="accordion-body">
+                                                {% if setups %}
+                                                    {% for setup in setups %}
+                                                        <div class="audit-cell-section">
+                                                            <div class="row setup-item" data-cell-name="{{ cell_name }}" data-order-number="{{ setup.order_number }}" data-setup-type="{{ setup.setup_type }}">
+                                                                <div class="col-md-8">
+                                                                    <div class="d-flex justify-content-between align-items-start">
+                                                                        <h5>Ordem de Produção: {{ setup.order_number }}</h5>
+                                                                        <div class="audit-status">
+                                                                            {% if setup.audited %}
+                                                                                <span class="badge bg-success audit-badge">
+                                                                                    <i class="fa fa-check-circle me-1"></i> Auditado
+                                                                                </span>
+                                                                                {% if setup.audit_notes %}
+                                                                                    <a href="#" class="ms-2 text-info audit-notes-icon" 
+                                                                                       data-bs-toggle="tooltip" data-bs-placement="top" 
+                                                                                       title="Ver anotações do auditor"
+                                                                                       onclick="showAuditNotes(event, '{{ setup.audit_notes|replace('\n', ' ')|e }}')">
+                                                                                        <i class="fa fa-sticky-note"></i>
+                                                                                    </a>
+                                                                                {% endif %}
+                                                                            {% else %}
+                                                                                <span class="badge bg-warning text-dark audit-badge">
+                                                                                    <i class="fa fa-clock-o me-1"></i> Pendente
+                                                                                </span>
+                                                                            {% endif %}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="setup-details setup-info">
+                                                                        <!-- Tipo de setup -->
+                                                                        <p>
+                                                                            <strong>Tipo:</strong>
+                                                                            {% if setup.setup_type == 'removal' %}
+                                                                                <span class="badge bg-danger">
+                                                                                    <i class="fa fa-minus-circle me-1"></i> Retirada de Material
+                                                                                </span>
+                                                                            {% else %}
+                                                                                <span class="badge bg-success">
+                                                                                    <i class="fa fa-plus-circle me-1"></i> Abastecimento de Material
+                                                                                </span>
+                                                                            {% endif %}
+                                                                        </p>
+                                                                        <p><strong>Data/Hora:</strong> {{ setup.timestamp }}</p>
+                                                                        <p>
+                                                                            <strong>
+                                                                                {% if setup.setup_type == 'removal' %}
+                                                                                    Operador da Retirada:
+                                                                                {% else %}
+                                                                                    Abastecedor:
+                                                                                {% endif %}
+                                                                            </strong> 
+                                                                            {{ setup.supplier_name }}
+                                                                        </p>
+                                                                        <p><strong>Verificação:</strong> 
+                                                                            {% if setup.verification_check %}
+                                                                                <span class="badge bg-success">Verificado</span>
+                                                                            {% else %}
+                                                                                <span class="badge bg-danger">Não Verificado</span>
+                                                                            {% endif %}
+                                                                        </p>
+                                                                        {% if setup.audited %}
+                                                                            <div class="audit-info">
+                                                                                <p><strong>Auditado por:</strong> {{ setup.auditor_name }}</p>
+                                                                                {% if setup.audit_timestamp %}
+                                                                                    <p><strong>Data da auditoria:</strong> {{ setup.audit_timestamp }}</p>
+                                                                                {% endif %}
+                                                                                <!-- Removido o acordeão para anotações do auditor, agora é exibido em popup pelo ícone no status -->
+                                                                            </div>
+                                                                        {% endif %}
+                                                                        <!-- Informações de produto (apenas para abastecimento) -->
+                                                                        {% if setup.setup_type == 'supply' and setup.product_code %}
+                                                                            <div class="product-info mb-2">
+                                                                                <p>
+                                                                                    <strong>Produto:</strong> 
+                                                                                    {{ setup.product_code }} - {{ setup.product_name }}
+                                                                                </p>
+                                                                                {% if setup.product_po %}
+                                                                                    <p>
+                                                                                        <strong>PO do Fornecedor (Produto):</strong> 
+                                                                                        {{ setup.product_po }}
+                                                                                    </p>
+                                                                                {% endif %}
+                                                                                
+                                                                                {% if setup.selected_items and setup.selected_items|length > 0 %}
+                                                                                    <div class="items-info mt-2">
+                                                                                        <p><strong>Itens do Produto:</strong></p>
+                                                                                        <ul class="list-group">
+                                                                                            {% for item in setup.selected_items %}
+                                                                                                <li class="list-group-item bg-dark">
+                                                                                                    <div>{{ item.code }} - {{ item.name }}</div>
+                                                                                                    {% if item.supplierPO %}
+                                                                                                        <small class="text-secondary">
+                                                                                                            PO do Fornecedor: {{ item.supplierPO }}
+                                                                                                        </small>
+                                                                                                    {% endif %}
+                                                                                                </li>
+                                                                                            {% endfor %}
+                                                                                        </ul>
+                                                                                    </div>
+                                                                                {% endif %}
+                                                                            </div>
+                                                                        {% endif %}
+                                                                        
+                                                                        {% if setup.observation %}
+                                                                            <p><strong>Observações do Abastecedor:</strong> {{ setup.observation }}</p>
+                                                                        {% endif %}
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-4 text-center">
+                                                                    {% if setup.has_image %}
+                                                                        <!-- Carrossel de imagens -->
+                                                                        <div id="carousel{{ cell_name }}{{ loop.index }}" class="carousel slide">
+                                                                            <div class="carousel-inner">
+                                                                                {% if setup.images %}
+                                                                                    {% for image in setup.images %}
+                                                                                        <div class="carousel-item {% if loop.first %}active{% endif %}">
+                                                                                            <img src="{{ url_for("get_photo", cell_name=cell_name, filepath=image.path) }}" 
+                                                                                                 class="setup-image img-fluid" alt="Foto {{ loop.index }} do Setup">
+                                                                                        </div>
+                                                                                    {% endfor %}
+                                                                                {% else %}
+                                                                                    <!-- Compatibilidade com formato antigo -->
+                                                                                    <div class="carousel-item active">
+                                                                                        <img src="{{ url_for("get_photo", cell_name=cell_name, filepath=setup.main_image) }}" 
+                                                                                             class="setup-image img-fluid" alt="Foto do Setup">
+                                                                                    </div>
+                                                                                {% endif %}
+                                                                            </div>
+                                                                            {% if setup.images|length > 1 %}
+                                                                                <button class="carousel-control-prev" type="button" data-bs-target="#carousel{{ cell_name }}{{ loop.index }}" data-bs-slide="prev">
+                                                                                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                                                                    <span class="visually-hidden">Anterior</span>
+                                                                                </button>
+                                                                                <button class="carousel-control-next" type="button" data-bs-target="#carousel{{ cell_name }}{{ loop.index }}" data-bs-slide="next">
+                                                                                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                                                                    <span class="visually-hidden">Próximo</span>
+                                                                                </button>
+                                                                                <div class="text-center mt-2">
+                                                                                    <span class="badge bg-secondary">{{ setup.images|length }} imagens</span>
+                                                                                </div>
+                                                                            {% endif %}
+                                                                        </div>
+                                                                    {% else %}
+                                                                        <div class="alert alert-warning">
+                                                                            Imagem não disponível
+                                                                        </div>
+                                                                    {% endif %}
+                                                                    
+                                                                        <button class="btn btn-sm btn-primary edit-setup-btn"
+                                                                                data-setup-id="{{ loop.index }}"
+                                                                                data-cell-name="{{ cell_name }}"
+                                                                                data-order-number="{{ setup.order_number }}"
+                                                                                data-supplier-name="{{ setup.supplier_name }}"
+                                                                                data-observation="{{ setup.observation }}"
+                                                                                data-verification-check="{{ setup.verification_check }}"
+                                                                                data-setup-type="{{ setup.setup_type }}">
+                                                                            <i class="fa fa-edit me-1"></i> Editar
+                                                                        </button>
+                                                                        
+                                                                        <button class="btn btn-sm btn-danger delete-setup-btn"
+                                                                                data-cell-name="{{ cell_name }}"
+                                                                                data-order-number="{{ setup.order_number }}"
+                                                                                data-setup-type="{{ setup.setup_type }}">
+                                                                            <i class="fa fa-trash me-1"></i> Excluir
+                                                                        </button>
+                                                                        
+                                                                        {% if not setup.audited %}
+                                                                            <button class="btn btn-sm btn-success mark-audited-btn"
+                                                                                    data-cell-name="{{ cell_name }}"
+                                                                                    data-order-number="{{ setup.order_number }}"
+                                                                                    data-supplier-name="{{ setup.supplier_name }}"
+                                                                                    data-observation="{{ setup.observation }}"
+                                                                                    data-verification-check="{{ setup.verification_check }}"
+                                                                                    data-setup-type="{{ setup.setup_type }}"
+                                                                                    data-action="mark">
+                                                                                <i class="fa fa-check-circle me-1"></i> Marcar como Auditado
+                                                                            </button>
+                                                                        {% else %}
+                                                                            <button class="btn btn-sm btn-warning mark-audited-btn"
+                                                                                    data-cell-name="{{ cell_name }}"
+                                                                                    data-order-number="{{ setup.order_number }}"
+                                                                                    data-supplier-name="{{ setup.supplier_name }}"
+                                                                                    data-observation="{{ setup.observation }}"
+                                                                                    data-verification-check="{{ setup.verification_check }}"
+                                                                                    data-setup-type="{{ setup.setup_type }}"
+                                                                                    data-action="unmark">
+                                                                                <i class="fa fa-undo me-1"></i> Desmarcar Auditoria
+                                                                            </button>
+                                                                        {% endif %}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <div class="alert alert-info">
+                                                        Nenhum setup cadastrado para esta célula.
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info">
+                                Nenhum setup cadastrado no sistema.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Setup Modal -->
+    <div class="modal fade" id="editSetupModal" tabindex="-1" aria-labelledby="editSetupModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editSetupModalLabel">Editar Setup</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editSetupForm">
+                        <!-- Hidden fields -->
+                        <input type="hidden" id="editCellName" name="cell_name">
+                        <input type="hidden" id="editOrderNumber" name="order_number">
+                        <input type="hidden" id="editSetupType" name="setup_type">
+                        
+                        <!-- Data e Hora do Registro -->
+                        <div class="mb-3">
+                            <label for="editTimestamp" class="form-label">Data e Hora do Registro</label>
+                            <input type="datetime-local" class="form-control" id="editTimestamp" name="timestamp">
+                        </div>
+                        
+                        <!-- Supplier Name -->
+                        <div class="mb-3">
+                            <label for="editSupplierName" class="form-label">Nome do Abastecedor</label>
+                            <input type="text" class="form-control" id="editSupplierName" name="supplier_name" required>
+                        </div>
+                        
+                        <!-- Photo Upload -->
+                        <div class="mb-3">
+                            <label for="editPhotoInput" class="form-label">Nova Foto (opcional)</label>
+                            <input type="file" class="form-control" id="editPhotoInput" accept="image/*">
+                            <div class="invalid-feedback">
+                                Por favor, selecione uma foto válida.
+                            </div>
+                            
+                            <!-- Hidden input to store base64 image data -->
+                            <input type="hidden" id="editPhotoData" name="photo_data">
+                            
+                            <!-- Image preview -->
+                            <div class="image-preview-container mt-3">
+                                <h6>Foto Atual:</h6>
+                                <img id="editImagePreview" class="img-fluid mb-3 border rounded" style="max-height: 200px; display: none;">
+                                <div id="noImageMessage" class="alert alert-warning">Sem foto disponível</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Observation -->
+                        <div class="mb-3">
+                            <label for="editObservation" class="form-label">Observações do Abastecedor (opcional)</label>
+                            <textarea class="form-control" id="editObservation" name="observation" rows="3"></textarea>
+                        </div>
+                        
+                        <!-- Verification Checkbox -->
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="editVerificationCheck" name="verification_check" value="true">
+                                <label class="form-check-label" for="editVerificationCheck">
+                                    Confirmo que verifiquei o abastecimento e a remoção de itens do produto anterior
+                                </label>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="saveSetupBtn">Salvar Alterações</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <!-- Modal de Confirmação de Exclusão -->
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header bg-danger">
+                    <h5 class="modal-title" id="deleteConfirmModalLabel">Confirmação de Exclusão</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Tem certeza que deseja excluir este registro?</p>
+                    <p><strong>Esta ação não pode ser desfeita.</strong></p>
+                    
+                    <div class="alert alert-danger">
+                        <i class="fa fa-warning me-2"></i> 
+                        Todos os dados associados a este registro, incluindo dados do setup e imagens serão permanentemente removidos.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Confirmar Exclusão</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para exibir as anotações do auditor (somente visualização) -->
+    <div class="modal fade" id="viewAuditNotesModal" tabindex="-1" aria-labelledby="viewAuditNotesModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header bg-info text-dark">
+                    <h5 class="modal-title" id="viewAuditNotesModalLabel">Anotações do Auditor</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="viewAuditNotesContent"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Função para exibir anotações do auditor em um modal (somente visualização)
+        function showAuditNotes(event, notes) {
+            event.preventDefault();
+            // Substituir quebras de linha HTML por quebras de linha JS
+            const formattedNotes = notes.replace(/\\n/g, '<br>');
+            document.getElementById('viewAuditNotesContent').innerHTML = formattedNotes;
+            
+            // Abrir o modal
+            const viewAuditNotesModal = new bootstrap.Modal(document.getElementById('viewAuditNotesModal'));
+            viewAuditNotesModal.show();
+        }
+
+        // Função para formatar data para campo datetime-local
+        function formatDateForInput(dateStr) {
+            // Formato esperado: YYYY-MM-DD HH:MM:SS
+            if (!dateStr) return '';
+            
+            // Separar data e hora
+            const parts = dateStr.split(' ');
+            if (parts.length !== 2) return '';
+            
+            // Formatar como YYYY-MM-DDThh:mm
+            return `${parts[0]}T${parts[1].substring(0, 5)}`;
+        }
+        
+        // Conversor de imagem para base64
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                return;
+            }
+            
+            // Verificar se é uma imagem
+            if (!file.type.match('image.*')) {
+                document.getElementById('editPhotoInput').classList.add('is-invalid');
+                return;
+            }
+            
+            // Limpar erro se existir
+            document.getElementById('editPhotoInput').classList.remove('is-invalid');
+            
+            // Ler arquivo como base64
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // Guardar dados da imagem
+                document.getElementById('editPhotoData').value = e.target.result;
+                
+                // Mostrar preview
+                const imagePreview = document.getElementById('editImagePreview');
+                imagePreview.src = e.target.result;
+                imagePreview.style.display = 'block';
+                document.getElementById('noImageMessage').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Adicionar evento ao input de foto
+            document.getElementById('editPhotoInput').addEventListener('change', handleImageUpload);
+        
+            // Adicionar evento para editar setup
+            const editSetupBtns = document.querySelectorAll('.edit-setup-btn');
+            editSetupBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const cellName = this.getAttribute('data-cell-name');
+                    const orderNumber = this.getAttribute('data-order-number');
+                    const supplierName = this.getAttribute('data-supplier-name') || '';
+                    const observation = this.getAttribute('data-observation') || '';
+                    const verificationCheck = this.getAttribute('data-verification-check') === 'True';
+                    const setupType = this.getAttribute('data-setup-type') || 'supply';
+                    const timestamp = this.getAttribute('data-timestamp') || '';
+                    const hasImage = this.getAttribute('data-has-image') === 'True';
+                    const fileIdentifier = `${orderNumber}_${setupType}`;
+                    
+                    // Atualizar o modal com os dados
+                    document.getElementById('editCellName').value = cellName;
+                    document.getElementById('editOrderNumber').value = orderNumber;
+                    document.getElementById('editSupplierName').value = supplierName || '';
+                    document.getElementById('editObservation').value = observation;
+                    document.getElementById('editVerificationCheck').checked = verificationCheck;
+                    document.getElementById('editSetupType').value = setupType;
+                    
+                    // Resetar campo de foto e preview
+                    document.getElementById('editPhotoData').value = '';
+                    document.getElementById('editPhotoInput').value = '';
+                    
+                    // Converter a data/hora para o formato datetime-local
+                    if (timestamp) {
+                        const formattedDate = formatDateForInput(timestamp);
+                        document.getElementById('editTimestamp').value = formattedDate;
+                    }
+                    
+                    // Atualizar preview da imagem se existir
+                    if (hasImage) {
+                        const imagePreview = document.getElementById('editImagePreview');
+                        const noImageMessage = document.getElementById('noImageMessage');
+                        
+                        imagePreview.src = `/photos/${cellName}/${fileIdentifier}.jpg?t=${new Date().getTime()}`;
+                        imagePreview.style.display = 'block';
+                        noImageMessage.style.display = 'none';
+                    } else {
+                        document.getElementById('editImagePreview').style.display = 'none';
+                        document.getElementById('noImageMessage').style.display = 'block';
+                    }
+                    
+                    // Atualizar o título do modal baseado no tipo de setup
+                    const modalTitle = document.getElementById('editSetupModalLabel');
+                    if (setupType === 'removal') {
+                        modalTitle.textContent = 'Editar Retirada de Material';
+                        document.querySelector('label[for="editSupplierName"]').textContent = 'Nome do Operador da Retirada';
+                    } else {
+                        modalTitle.textContent = 'Editar Abastecimento de Material';
+                        document.querySelector('label[for="editSupplierName"]').textContent = 'Nome do Abastecedor';
+                    }
+                    
+                    // Abrir o modal
+                    const modal = new bootstrap.Modal(document.getElementById('editSetupModal'));
+                    modal.show();
+                });
+            });
+            
+            // Botão para salvar alterações
+            document.getElementById('saveSetupBtn').addEventListener('click', function() {
+                const cellName = document.getElementById('editCellName').value;
+                const orderNumber = document.getElementById('editOrderNumber').value;
+                const supplierName = document.getElementById('editSupplierName').value;
+                const observation = document.getElementById('editObservation').value;
+                const verificationCheck = document.getElementById('editVerificationCheck').checked;
+                const setupType = document.getElementById('editSetupType').value;
+                const photoData = document.getElementById('editPhotoData').value;
+                const timestamp = document.getElementById('editTimestamp').value;
+                
+                // Formatar timestamp para o formato que o servidor espera (se existir)
+                let formattedTimestamp = null;
+                if (timestamp) {
+                    // Converter de YYYY-MM-DDThh:mm para YYYY-MM-DD HH:MM:SS
+                    const dateTime = new Date(timestamp);
+                    formattedTimestamp = `${dateTime.getFullYear()}-${String(dateTime.getMonth() + 1).padStart(2, '0')}-${String(dateTime.getDate()).padStart(2, '0')} ${String(dateTime.getHours()).padStart(2, '0')}:${String(dateTime.getMinutes()).padStart(2, '0')}:00`;
+                }
+                
+                // Salvar alterações via API
+                updateSetup(cellName, orderNumber, supplierName, observation, verificationCheck, false, null, setupType, photoData, formattedTimestamp);
+            });
+            
+            // Adicionar evento para marcar como auditado
+            const markAuditedBtns = document.querySelectorAll('.mark-audited-btn');
+            markAuditedBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const cellName = this.getAttribute('data-cell-name');
+                    const orderNumber = this.getAttribute('data-order-number');
+                    const supplierName = this.getAttribute('data-supplier-name');
+                    const observation = this.getAttribute('data-observation');
+                    const verificationCheck = this.getAttribute('data-verification-check') === 'True';
+                    const setupType = this.getAttribute('data-setup-type') || 'supply';
+                    
+                    // Verificar se é ação de marcar ou desmarcar
+                    const action = this.getAttribute('data-action') || 'mark';
+                    
+                    // Atualizar o atributo data-action para a função markSetupAsAudited
+                    this.setAttribute('data-action', action);
+                    
+                    markSetupAsAudited(cellName, orderNumber, supplierName, observation, verificationCheck, setupType);
+                });
+            });
+            
+            // Adicionar evento para excluir setup
+            const deleteSetupBtns = document.querySelectorAll('.delete-setup-btn');
+            deleteSetupBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const cellName = this.getAttribute('data-cell-name');
+                    const orderNumber = this.getAttribute('data-order-number');
+                    const setupType = this.getAttribute('data-setup-type');
+                    
+                    // Configurar modal de confirmação
+                    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+                    confirmDeleteBtn.onclick = function() {
+                        deleteSetup(cellName, orderNumber, setupType);
+                    };
+                    
+                    // Abrir modal de confirmação
+                    const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+                    deleteConfirmModal.show();
+                });
+            });
+        });
+        
+        // Função para atualizar setup
+        function updateSetup(cellName, orderNumber, supplierName, observation, verificationCheck, audited, auditor_name, setupType, photoData, timestamp) {
+            // Preparar dados para a API
+            const data = {
+                cell_name: cellName,
+                order_number: orderNumber,
+                supplier_name: supplierName,
+                observation: observation,
+                verification_check: verificationCheck,
+                setup_type: setupType
+            };
+            
+            if (audited !== undefined) {
+                data.audited = audited;
+            }
+            
+            if (auditor_name) {
+                data.auditor_name = auditor_name;
+            }
+            
+            if (photoData) {
+                data.photo_data = photoData;
+            }
+            
+            if (timestamp) {
+                data.timestamp = timestamp;
+            }
+            
+            // Enviar requisição para API
+            fetch('/api/update_setup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Fechar o modal se estiver aberto
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('editSetupModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+                    
+                    // Mostrar mensagem de sucesso
+                    const alertContainer = document.getElementById('alertContainer');
+                    alertContainer.innerHTML = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            Setup atualizado com sucesso!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    
+                    // Recarregar a página para mostrar os dados atualizados
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    throw new Error(data.message || 'Erro ao atualizar setup');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                
+                // Mostrar mensagem de erro
+                const alertContainer = document.getElementById('alertContainer');
+                alertContainer.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        ${error.message || 'Erro ao atualizar setup'}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+            });
+        }
+        
+        // Função para marcar setup como auditado
+        function markSetupAsAudited(cellName, orderNumber, supplierName, observation, verificationCheck, setupType) {
+            // Desabilitar botão durante o processo
+            const btn = event.target.closest('.mark-audited-btn');
+            const originalBtnHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
+            
+            // Verificar se é para marcar ou desmarcar auditoria
+            const action = btn.getAttribute('data-action') || 'mark';
+            
+            // Se for uma ação de marcar como auditado, mostrar o modal para anotações
+            if (action === 'mark') {
+                // Configurar o modal para enviar os dados corretos quando confirmado
+                document.getElementById('auditNotesForm').onsubmit = function(e) {
+                    e.preventDefault();
+
+                    // Verificar se o checkbox de presença foi marcado
+                    const confirmPresence = document.getElementById('confirmPresence');
+                    if (!confirmPresence.checked) {
+                        confirmPresence.classList.add('is-invalid');
+                        return false;
+                    }
+
+                    const auditNotes = document.getElementById('auditNotes').value;
+                    
+                    // Preparar dados para a API com as anotações
+                    const data = {
+                        cell_name: cellName,
+                        order_number: orderNumber,
+                        supplier_name: supplierName,
+                        observation: observation,
+                        verification_check: verificationCheck,
+                        setup_type: setupType,
+                        is_mark: true,
+                        audit_notes: auditNotes
+                    };
+                    
+                    // Chamar API para marcar como auditado com as anotações
+                    submitAuditRequest(data, btn, originalBtnHTML);
+                    
+                    // Fechar o modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('auditNotesModal'));
+                    modal.hide();
+                };
+                
+                // Mostrar o modal
+                const auditNotesModal = new bootstrap.Modal(document.getElementById('auditNotesModal'));
+                auditNotesModal.show();
+                
+                // Restaurar o botão
+                btn.disabled = false;
+                btn.innerHTML = originalBtnHTML;
+            } else {
+                // Se for para desmarcar, seguir o fluxo normal sem modal
+                const data = {
+                    cell_name: cellName,
+                    order_number: orderNumber,
+                    supplier_name: supplierName,
+                    observation: observation,
+                    verification_check: verificationCheck,
+                    setup_type: setupType,
+                    is_mark: false
+                };
+                
+                submitAuditRequest(data, btn, originalBtnHTML);
+            }
+        }
+        
+        // Função para excluir setup
+        function deleteSetup(cellName, orderNumber, setupType) {
+            // Preparar dados para a API
+            const data = {
+                cell_name: cellName,
+                order_number: orderNumber,
+                setup_type: setupType
+            };
+            
+            // Fechar o modal de confirmação
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Mostrar mensagem de processamento
+            const alertContainer = document.getElementById('alertContainer');
+            alertContainer.innerHTML = `
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Excluindo registro, aguarde...
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            
+            // Enviar requisição para API
+            fetch('/api/delete_setup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mostrar mensagem de sucesso
+                    alertContainer.innerHTML = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            Registro excluído com sucesso!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    
+                    // Recarregar a página após um pequeno delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    throw new Error(data.message || 'Erro ao excluir o registro');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                
+                // Mostrar mensagem de erro
+                alertContainer.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        ${error.message || 'Erro ao excluir o registro'}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+            });
+        }
+        
+        // Função para enviar a requisição de auditoria
+        function submitAuditRequest(data, btn, originalBtnHTML) {
+            // Desabilitar o botão durante o processo
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
+            
+            // Enviar requisição para API
+            fetch('/api/mark_as_audited', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mostrar mensagem de sucesso
+                    const alertContainer = document.getElementById('alertContainer');
+                    const action = btn.getAttribute('data-action') || 'mark';
+                    const isMarking = action === 'mark';
+                    
+                    alertContainer.innerHTML = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            ${isMarking ? 
+                                `Setup marcado como auditado por ${data.auditor_name}!` : 
+                                'Setup desmarcado com sucesso. Status de auditoria removido.'}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    
+                    // Obter o estado atual do URL (para manter a célula atual aberta)
+                    const currentUrl = new URL(window.location.href);
+                    const hasFilters = Array.from(currentUrl.searchParams.keys()).length > 0;
+                    
+                    // Atualizar a célula específica sem recarregar a página inteira
+                    const setupCard = document.querySelector(`.setup-item[data-cell-name="${data.cell_name}"][data-order-number="${data.order_number}"][data-setup-type="${data.setup_type}"]`);
+                    
+                    if (setupCard) {
+                        // Animar o card para indicar a mudança
+                        setupCard.classList.add('border-success');
+                        
+                        // Atualizar o conteúdo do card com o novo status de auditoria
+                        const setupItem = setupCard; // Já temos o setupItem, não precisamos procurar novamente
+                        const statusBadge = setupItem.querySelector('.audit-status');
+                        
+                        // Obter referência ao botão atual
+                        const currentBtn = setupCard.querySelector('.mark-audited-btn');
+                        
+                        if (isMarking) {
+                            // Atualizar para status auditado
+                            statusBadge.innerHTML = '<span class="badge bg-success">Auditado</span>';
+                            
+                            // Adicionar informações do auditor
+                            const auditInfoHTML = `
+                                <p><strong>Auditado por:</strong> ${data.auditor_name}</p>
+                                ${data.audit_notes ? `
+                                <div class="accordion mt-2 mb-2" id="auditNotesAccordionDynamic">
+                                    <div class="accordion-item bg-dark border-secondary">
+                                        <h2 class="accordion-header" id="auditNotesHeadingDynamic">
+                                            <button class="accordion-button collapsed bg-dark text-light py-2" type="button" 
+                                                    data-bs-toggle="collapse" data-bs-target="#auditNotesCollapseDynamic" 
+                                                    aria-expanded="false" aria-controls="auditNotesCollapseDynamic"
+                                                    style="font-size: 0.95rem;">
+                                                <strong>Anotações do Auditor</strong>
+                                            </button>
+                                        </h2>
+                                        <div id="auditNotesCollapseDynamic" class="accordion-collapse collapse" 
+                                              aria-labelledby="auditNotesHeadingDynamic" 
+                                              data-bs-parent="#auditNotesAccordionDynamic">
+                                            <div class="accordion-body py-2">
+                                                ${data.audit_notes}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>` : ''}
+                            `;
+                            
+                            // Inserir informações de auditoria após o status
+                            const infoContainer = setupItem.querySelector('.setup-info');
+                            if (!setupItem.querySelector('.audit-info')) {
+                                const auditInfoDiv = document.createElement('div');
+                                auditInfoDiv.className = 'audit-info';
+                                auditInfoDiv.innerHTML = auditInfoHTML;
+                                infoContainer.insertBefore(auditInfoDiv, infoContainer.querySelector('p:last-child'));
+                            } else {
+                                setupItem.querySelector('.audit-info').innerHTML = auditInfoHTML;
+                            }
+                            
+                            // Alterar o botão para "Desmarcar Auditoria"
+                            currentBtn.innerHTML = '<i class="fa fa-undo me-1"></i> Desmarcar Auditoria';
+                            currentBtn.className = 'btn btn-sm btn-warning mark-audited-btn';
+                            currentBtn.setAttribute('data-action', 'unmark');
+                        } else {
+                            // Atualizar para status pendente
+                            statusBadge.innerHTML = '<span class="badge bg-warning text-dark">Pendente</span>';
+                            
+                            // Remover informações do auditor se existirem
+                            const auditInfo = setupItem.querySelector('.audit-info');
+                            if (auditInfo) {
+                                auditInfo.remove();
+                            }
+                            
+                            // Alterar o botão para "Marcar como Auditado"
+                            currentBtn.innerHTML = '<i class="fa fa-check-circle me-1"></i> Marcar como Auditado';
+                            currentBtn.className = 'btn btn-sm btn-success mark-audited-btn';
+                            currentBtn.setAttribute('data-action', 'mark');
+                        }
+                        
+                        // Reabilitar o botão
+                        currentBtn.disabled = false;
+                        
+                        // Se tiver filtros aplicados, ainda precisamos recarregar a página
+                        if (hasFilters) {
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1500);
+                        }
+                    } else {
+                        // Fallback para recarregar a página
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    }
+                } else {
+                    throw new Error(data.message || 'Erro ao marcar setup como auditado');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                
+                // Mostrar mensagem de erro
+                const alertContainer = document.getElementById('alertContainer');
+                alertContainer.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        ${error.message || 'Erro ao marcar setup como auditado'}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                
+                // Restaurar botão
+                btn.disabled = false;
+                btn.innerHTML = originalBtnHTML;
+            });
+        }
+    </script>
+    
+    <style>
+        /* Estilos adicionais para auditoria */
+        .audit-badge {
+            font-size: 0.9rem;
+            padding: 0.5rem 0.7rem;
+        }
+        
+        .audit-cell-section {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1.5rem 0;
+            margin-bottom: 1rem;
+        }
+        
+        .audit-cell-section:last-child {
+            border-bottom: none;
+        }
+        
+        .setup-image {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: 4px;
+            border: 1px solid #444;
+        }
+        
+        /* Estilo para formulário de filtro */
+        .form-select, .form-control {
+            background-color: #2b3035;
+            border-color: #495057;
+            color: #e9ecef;
+        }
+        
+        /* Estilo para botões agrupados */
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .btn-group .btn {
+            margin-bottom: 0.5rem;
+            width: 100%;
+        }
+    </style>
+</body>
+</html>

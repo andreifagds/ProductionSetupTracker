@@ -1,0 +1,1946 @@
+import os
+import json
+import logging
+import datetime
+import base64
+from io import BytesIO
+from PIL import Image
+from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
+from flask import (
+    Flask, render_template, request, redirect, 
+    url_for, session, flash, jsonify, send_from_directory
+)
+
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("SESSION_SECRET", "setup_tracking_secret_key")
+
+# Definir diretório de dados
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dados_setup")
+
+
+def ensure_dir(directory):
+    """Create directory if it doesn't exist."""
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
+
+def init_data_files():
+    """Initialize data files if they don't exist."""
+    ensure_dir(DATA_DIR)
+    
+    # Lista de arquivos a serem inicializados
+    files = {
+        "qrcodes.json": {},
+        "users.json": {
+            # Usuário administrador padrão
+            "admin": {
+                "password": generate_password_hash("admin123"),
+                "profile": "auditor"
+            }
+        }
+    }
+    
+    # Verificar e criar cada arquivo, apenas se não existir
+    for filename, default_data in files.items():
+        file_path = os.path.join(DATA_DIR, filename)
+        if not os.path.exists(file_path):
+            with open(file_path, 'w') as f:
+                json.dump(default_data, f)
+                
+    # Garantir que o admin sempre exista
+    try:
+        users = get_users()
+        logging.debug("Tentando recriar o usuário admin")
+        if "admin" not in users:
+            users["admin"] = {
+                "password": generate_password_hash("admin123"),
+                "profile": "auditor"
+            }
+            save_users(users)
+            logging.debug("Usuário admin recriado")
+        else:
+            # Atualizar senha apenas se ela não ainda não estiver definida
+            if not users["admin"].get("password"):
+                users["admin"]["password"] = generate_password_hash("admin123")
+                save_users(users)
+                logging.debug("Senha do admin criada")
+            
+            # Garantir que o perfil seja auditor
+            if users["admin"].get("profile") != "auditor":
+                users["admin"]["profile"] = "auditor"
+                save_users(users)
+                logging.debug("Perfil do admin atualizado para auditor")
+            
+            logging.debug("Senha do admin atualizada")
+    except Exception as e:
+        logging.error(f"Erro ao atualizar admin: {e}")
+
+
+def get_users():
+    """Get all users from users.json."""
+    users_file = os.path.join(DATA_DIR, "users.json")
+    
+    if os.path.exists(users_file):
+        try:
+            with open(users_file, 'r') as f:
+                return json.load(f)
+        except:
+            pass
+            
+    return {}
+
+
+def save_users(users_dict):
+    """Save users dictionary to users.json in list format."""
+    users_file = os.path.join(DATA_DIR, "users.json")
+    ensure_dir(DATA_DIR)
+    
+    with open(users_file, 'w') as f:
+        json.dump(users_dict, f)
+
+
+def add_user(username, password, profile='auditor'):
+    """Add a new user or update existing user.
+    
+    Args:
+        username: Nome do usuário
+        password: Senha do usuário
+        profile: Perfil do usuário ('auditor' ou 'supplier')
+    """
+    if not username or not password:
+        return False
+        
+    users = get_users()
+    
+    # Hash da senha
+    password_hash = generate_password_hash(password)
+    
+    # Verificar se o usuário já existe
+    if username in users:
+        # Atualizar senha e perfil
+        users[username]["password"] = password_hash
+        users[username]["profile"] = profile
+    else:
+        # Adicionar novo usuário
+        users[username] = {
+            "password": password_hash,
+            "profile": profile
+        }
+        
+    save_users(users)
+    return True
+
+
+def delete_user(username):
+    """Delete a user."""
+    if not username:
+        return False
+        
+    users = get_users()
+    
+    if username in users:
+        del users[username]
+        save_users(users)
+        return True
+        
+    return False
+
+
+def authenticate_user(username, password):
+    """Authenticate a user with username and password."""
+    if not username or not password:
+        return False
+        
+    users = get_users()
+    
+    if username in users and users[username].get("password"):
+        return check_password_hash(users[username]["password"], password)
+        
+    return False
+
+
+def get_qrcodes():
+    """Get all QR codes from qrcodes.json."""
+    qrcodes_file = os.path.join(DATA_DIR, "qrcodes.json")
+    
+    if os.path.exists(qrcodes_file):
+        try:
+            with open(qrcodes_file, 'r') as f:
+                return json.load(f)
+        except:
+            pass
+            
+    return {}
+
+
+def save_qrcode(qrcode_value, cell_name):
+    """Save a new QR code and cell name mapping."""
+    qrcodes = get_qrcodes()
+    
+    # Verificar o formato atual do arquivo qrcodes.json
+    if isinstance(qrcodes, dict):
+        # Formato novo: cada QR code tem uma estrutura com cell_name e produtos
+        if qrcode_value in qrcodes:
+            # Atualizar o cell_name se o QR code já existir
+            qrcodes[qrcode_value]["cell_name"] = cell_name
+        else:
+            # Criar novo registro com estrutura para produtos
+            qrcodes[qrcode_value] = {
+                "cell_name": cell_name,
+                "products": []
+            }
+    else:
+        # Formato antigo ou inválido, criar um novo dicionário
+        qrcodes = {
+            qrcode_value: {
+                "cell_name": cell_name,
+                "products": []
+            }
+        }
+    
+    # Salvar o arquivo atualizado
+    qrcodes_file = os.path.join(DATA_DIR, "qrcodes.json")
+    ensure_dir(DATA_DIR)
+    
+    with open(qrcodes_file, 'w') as f:
+        json.dump(qrcodes, f)
+        
+    return True
+
+
+def update_qrcodes_format():
+    """Atualiza o formato do arquivo qrcodes.json para o novo formato com produtos e itens."""
+    qrcodes_file = os.path.join(DATA_DIR, "qrcodes.json")
+    
+    if not os.path.exists(qrcodes_file):
+        # Se o arquivo não existir, criar um novo já no formato correto
+        with open(qrcodes_file, 'w') as f:
+            json.dump({}, f)
+        return True
+    
+    try:
+        with open(qrcodes_file, 'r') as f:
+            qrcodes = json.load(f)
+        
+        updated = False
+        new_qrcodes = {}
+        
+        # Verificar o formato atual
+        if isinstance(qrcodes, dict):
+            # Iterar por cada QR code
+            for qrcode, value in qrcodes.items():
+                if isinstance(value, str):
+                    # Formato antigo: QR code -> cell_name (string)
+                    new_qrcodes[qrcode] = {
+                        "cell_name": value,
+                        "products": []
+                    }
+                    updated = True
+                elif isinstance(value, dict) and "cell_name" in value:
+                    # Formato novo: QR code -> { cell_name, products }
+                    if "products" not in value:
+                        value["products"] = []
+                        updated = True
+                    new_qrcodes[qrcode] = value
+                else:
+                    # Formato desconhecido, criar estrutura padrão
+                    new_qrcodes[qrcode] = {
+                        "cell_name": str(value),
+                        "products": []
+                    }
+                    updated = True
+        else:
+            # Se não for um dicionário, criar um novo objeto vazio
+            new_qrcodes = {}
+            updated = True
+        
+        # Salvar apenas se houve atualização
+        if updated:
+            with open(qrcodes_file, 'w') as f:
+                json.dump(new_qrcodes, f)
+            
+        return updated
+    except Exception as e:
+        logging.error(f"Erro ao atualizar formato dos QR codes: {e}")
+        return False
+
+
+def add_product_to_cell(cell_name, product_code, product_name):
+    """Adiciona um produto a uma célula específica.
+    
+    Args:
+        cell_name: Nome da célula
+        product_code: Código do produto
+        product_name: Nome do produto
+        
+    Returns:
+        bool: True se adicionado com sucesso, False caso contrário
+    """
+    qrcodes = get_qrcodes()
+    qrcodes_file = os.path.join(DATA_DIR, "qrcodes.json")
+    
+    # Verificar se a célula existe em algum QR code
+    cell_found = False
+    
+    for qrcode, data in qrcodes.items():
+        if isinstance(data, dict) and data.get("cell_name") == cell_name:
+            # Célula encontrada, verificar se o produto já existe
+            products = data.get("products", [])
+            
+            # Verificar se o produto já existe
+            product_exists = False
+            for product in products:
+                if product.get("code") == product_code:
+                    # Produto encontrado, atualizar o nome
+                    product["name"] = product_name
+                    product_exists = True
+                    break
+            
+            # Se o produto não existe, adicionar
+            if not product_exists:
+                products.append({
+                    "code": product_code,
+                    "name": product_name,
+                    "items": []
+                })
+            
+            # Atualizar a lista de produtos na célula
+            data["products"] = products
+            cell_found = True
+            
+            # Como a célula pode estar em múltiplos QR codes, continuamos verificando
+    
+    # Se a célula não foi encontrada em nenhum QR code, criar um novo QR code com o nome da célula
+    if not cell_found:
+        # Verificamos se existe algum QR code com o mesmo nome da célula
+        cell_qrcode = None
+        for qrcode, data in qrcodes.items():
+            if qrcode == cell_name:
+                cell_qrcode = qrcode
+                break
+        
+        if cell_qrcode:
+            # QR code encontrado com o mesmo nome da célula
+            if isinstance(qrcodes[cell_qrcode], dict) and "products" in qrcodes[cell_qrcode]:
+                # Verificar se o produto já existe
+                products = qrcodes[cell_qrcode]["products"]
+                product_exists = False
+                
+                for product in products:
+                    if product.get("code") == product_code:
+                        # Produto encontrado, atualizar o nome
+                        product["name"] = product_name
+                        product_exists = True
+                        break
+                
+                # Se o produto não existe, adicionar
+                if not product_exists:
+                    products.append({
+                        "code": product_code,
+                        "name": product_name,
+                        "items": []
+                    })
+                
+                cell_found = True
+            else:
+                # QR code existe mas no formato antigo, atualizar para o novo formato
+                qrcodes[cell_qrcode] = {
+                    "cell_name": cell_name,
+                    "products": [{
+                        "code": product_code,
+                        "name": product_name,
+                        "items": []
+                    }]
+                }
+                cell_found = True
+        else:
+            # Criar um novo QR code com o nome da célula
+            qrcodes[cell_name] = {
+                "cell_name": cell_name,
+                "products": [{
+                    "code": product_code,
+                    "name": product_name,
+                    "items": []
+                }]
+            }
+            cell_found = True
+    
+    # Salvar as alterações
+    if cell_found:
+        with open(qrcodes_file, 'w') as f:
+            json.dump(qrcodes, f)
+        return True
+    
+    return False
+
+
+def add_item_to_product(cell_name, product_code, item_code, item_name):
+    """Adiciona um item a um produto de uma célula específica.
+    
+    Args:
+        cell_name: Nome da célula
+        product_code: Código do produto
+        item_code: Código do item
+        item_name: Nome do item
+        
+    Returns:
+        bool: True se adicionado com sucesso, False caso contrário
+    """
+    qrcodes = get_qrcodes()
+    qrcodes_file = os.path.join(DATA_DIR, "qrcodes.json")
+    
+    # Verificar se a célula e o produto existem
+    cell_found = False
+    product_found = False
+    
+    for qrcode, data in qrcodes.items():
+        if isinstance(data, dict) and data.get("cell_name") == cell_name:
+            # Célula encontrada, procurar o produto
+            products = data.get("products", [])
+            
+            for product in products:
+                if product.get("code") == product_code:
+                    # Produto encontrado, verificar se o item já existe
+                    items = product.get("items", [])
+                    
+                    # Verificar se o item já existe
+                    item_exists = False
+                    for item in items:
+                        if item.get("code") == item_code:
+                            # Item encontrado, atualizar o nome
+                            item["name"] = item_name
+                            item_exists = True
+                            break
+                    
+                    # Se o item não existe, adicionar
+                    if not item_exists:
+                        items.append({
+                            "code": item_code,
+                            "name": item_name
+                        })
+                    
+                    # Atualizar a lista de itens no produto
+                    product["items"] = items
+                    cell_found = True
+                    product_found = True
+                    break
+            
+            # Se encontrou a célula e o produto, não precisa continuar procurando
+            if cell_found and product_found:
+                break
+    
+    # Salvar as alterações se encontrou a célula e o produto
+    if cell_found and product_found:
+        with open(qrcodes_file, 'w') as f:
+            json.dump(qrcodes, f)
+        return True
+    
+    return False
+
+
+def get_cell_products(cell_name):
+    """Obtém todos os produtos de uma célula específica.
+    
+    Args:
+        cell_name: Nome da célula
+        
+    Returns:
+        list: Lista de produtos da célula ou lista vazia se não encontrar
+    """
+    if not cell_name:
+        return []
+    
+    logging.info(f"Buscando produtos para célula: {cell_name}")
+    qrcodes = get_qrcodes()
+    
+    # Debug para verificar a estrutura do arquivo qrcodes.json
+    logging.debug(f"Estrutura de qrcodes.json: {json.dumps(qrcodes, indent=2)}")
+    
+    # Verificar chaves disponíveis
+    logging.debug(f"Chaves disponíveis no primeiro nível: {list(qrcodes.keys())}")
+    
+    # Primeiro, tentar encontrar a célula diretamente pelo cell_name
+    for qrcode, data in qrcodes.items():
+        if isinstance(data, dict) and data.get("cell_name") == cell_name:
+            # Célula encontrada, verificar se tem produtos
+            products = data.get("products", [])
+            
+            logging.debug(f"Dados encontrados para célula {cell_name} diretamente: {json.dumps(data, indent=2)}")
+            logging.debug(f"Produtos encontrados diretamente: {json.dumps(products, indent=2)}")
+            logging.debug(f"Produtos encontrados diretamente para célula {cell_name}: {len(products)}")
+            
+            return products
+    
+    # Se não encontrou, verificar se o cell_name é um QR code
+    if cell_name in qrcodes:
+        data = qrcodes[cell_name]
+        if isinstance(data, dict):
+            logging.debug(f"Dados encontrados para célula {cell_name} diretamente: {json.dumps(data, indent=2)}")
+            products = data.get("products", [])
+            logging.debug(f"Produtos encontrados pelo QR code: {len(products)}")
+            return products
+    
+    # Tentar busca parcial por correspondência no nome da célula
+    logging.debug(f"Buscando por correspondência entre cell_name={cell_name} e data.cell_name em todos os QR codes")
+    
+    for qrcode, data in qrcodes.items():
+        if isinstance(data, dict):
+            cell_name_in_qrcode = data.get("cell_name", "")
+            logging.debug(f"Verificando QR {qrcode} com cell_name={cell_name_in_qrcode}")
+            
+            if cell_name and cell_name_in_qrcode and (cell_name in cell_name_in_qrcode or cell_name_in_qrcode in cell_name):
+                # Correspondência parcial encontrada
+                products = data.get("products", [])
+                logging.debug(f"Correspondência parcial encontrada. Produtos: {len(products)}")
+                return products
+    
+    # Último recurso: tentar busca por correspondência parcial no qrcode
+    logging.debug(f"Tentando busca por correspondência parcial para {cell_name}")
+    
+    for qrcode, data in qrcodes.items():
+        if cell_name in qrcode or qrcode in cell_name:
+            # Correspondência parcial no QR code
+            if isinstance(data, dict):
+                products = data.get("products", [])
+                logging.debug(f"Correspondência parcial no QR code. Produtos: {len(products)}")
+                return products
+    
+    # Não encontrou produtos para a célula
+    logging.debug(f"Nenhum produto encontrado para célula {cell_name}")
+    return []
+
+
+def get_product_items(cell_name, product_code):
+    """Obtém todos os itens de um produto específico em uma célula.
+    
+    Args:
+        cell_name: Nome da célula
+        product_code: Código do produto
+        
+    Returns:
+        list: Lista de itens do produto ou lista vazia se não encontrar
+    """
+    products = get_cell_products(cell_name)
+    
+    for product in products:
+        if product.get("code") == product_code:
+            return product.get("items", [])
+    
+    return []
+
+
+def get_all_cells():
+    """Obtém todas as células cadastradas no sistema.
+    
+    Returns:
+        list: Lista com informações de todas as células
+    """
+    qrcodes = get_qrcodes()
+    cells = {}
+    
+    for qrcode, data in qrcodes.items():
+        if isinstance(data, dict) and "cell_name" in data:
+            cell_name = data["cell_name"]
+            
+            if cell_name not in cells:
+                products_count = len(data.get("products", []))
+                items_count = sum(len(product.get("items", [])) for product in data.get("products", []))
+                
+                cells[cell_name] = {
+                    "name": cell_name,
+                    "products_count": products_count,
+                    "items_count": items_count,
+                    "qrcodes": [qrcode]
+                }
+            else:
+                cells[cell_name]["qrcodes"].append(qrcode)
+    
+    return list(cells.values())
+
+
+def remove_product_from_cell(cell_name, product_code):
+    """Remove um produto de uma célula específica.
+    
+    Args:
+        cell_name: Nome da célula
+        product_code: Código do produto
+        
+    Returns:
+        bool: True se removido com sucesso, False caso contrário
+    """
+    qrcodes = get_qrcodes()
+    qrcodes_file = os.path.join(DATA_DIR, "qrcodes.json")
+    
+    # Verificar se a célula existe
+    cell_found = False
+    product_removed = False
+    
+    for qrcode, data in qrcodes.items():
+        if isinstance(data, dict) and data.get("cell_name") == cell_name:
+            # Célula encontrada, procurar o produto
+            products = data.get("products", [])
+            
+            # Encontrar e remover o produto
+            new_products = [p for p in products if p.get("code") != product_code]
+            
+            if len(new_products) < len(products):
+                # Produto removido
+                data["products"] = new_products
+                product_removed = True
+            
+            cell_found = True
+    
+    # Salvar as alterações se encontrou a célula e removeu o produto
+    if cell_found and product_removed:
+        with open(qrcodes_file, 'w') as f:
+            json.dump(qrcodes, f)
+        return True
+    
+    return False
+
+
+def remove_item_from_product(cell_name, product_code, item_code):
+    """Remove um item de um produto em uma célula específica.
+    
+    Args:
+        cell_name: Nome da célula
+        product_code: Código do produto
+        item_code: Código do item
+        
+    Returns:
+        bool: True se removido com sucesso, False caso contrário
+    """
+    qrcodes = get_qrcodes()
+    qrcodes_file = os.path.join(DATA_DIR, "qrcodes.json")
+    
+    # Verificar se a célula e o produto existem
+    cell_found = False
+    item_removed = False
+    
+    for qrcode, data in qrcodes.items():
+        if isinstance(data, dict) and data.get("cell_name") == cell_name:
+            # Célula encontrada, procurar o produto
+            products = data.get("products", [])
+            
+            for product in products:
+                if product.get("code") == product_code:
+                    # Produto encontrado, procurar e remover o item
+                    items = product.get("items", [])
+                    
+                    new_items = [i for i in items if i.get("code") != item_code]
+                    
+                    if len(new_items) < len(items):
+                        # Item removido
+                        product["items"] = new_items
+                        item_removed = True
+                    
+                    break
+            
+            cell_found = True
+            
+            # Se removeu o item, não precisa continuar procurando
+            if item_removed:
+                break
+    
+    # Salvar as alterações se encontrou a célula e removeu o item
+    if cell_found and item_removed:
+        with open(qrcodes_file, 'w') as f:
+            json.dump(qrcodes, f)
+        return True
+    
+    return False
+
+
+def get_cell_name(qrcode_value):
+    """Get the cell name associated with a QR code."""
+    if not qrcode_value:
+        return None
+        
+    qrcodes = get_qrcodes()
+    
+    # Verificar se o QR code existe no mapeamento
+    if qrcode_value in qrcodes:
+        # Formato novo (estrutura com cell_name e products)
+        if isinstance(qrcodes[qrcode_value], dict) and "cell_name" in qrcodes[qrcode_value]:
+            return qrcodes[qrcode_value]["cell_name"]
+        # Formato antigo (string direta para cell_name)
+        elif isinstance(qrcodes[qrcode_value], str):
+            return qrcodes[qrcode_value]
+    
+    # Se chegou aqui, não encontrou o QR code
+    return None
+
+
+def save_setup(cell_name, order_number, supplier_name, photo_data, observation, verification_check, product_code=None, product_name=None, product_po=None, selected_items=None, setup_type="supply"):
+    """Save setup data to a text file and the photo as an image file.
+    
+    Args:
+        cell_name: Nome da célula de produção
+        order_number: Número da ordem de produção
+        supplier_name: Nome do abastecedor
+        photo_data: Dados da foto em base64 (string única ou lista de strings)
+        observation: Observações
+        verification_check: Se a verificação foi realizada
+        product_code: (Opcional) Código do produto selecionado (apenas para abastecimento)
+        product_name: (Opcional) Nome do produto selecionado (apenas para abastecimento)
+        product_po: (Opcional) PO do fornecedor para o produto (apenas para abastecimento)
+        selected_items: (Opcional) Lista de itens selecionados com seus POs de fornecedor (apenas para abastecimento)
+        setup_type: Tipo de setup ('removal' para retirada, 'supply' para abastecimento)
+    """
+    if not cell_name or not order_number or not supplier_name:
+        logging.error("Missing required setup data")
+        return False, "Campos obrigatórios não informados"
+    
+    # Verificar se já existe um setup do mesmo tipo para esta ordem
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    ensure_dir(cell_dir)
+    
+    # Caminho para o arquivo de texto
+    text_file_path = os.path.join(cell_dir, f"{order_number}_{setup_type}.txt")
+    if os.path.exists(text_file_path):
+        # Já existe um setup deste tipo para esta ordem
+        # Podemos decidir se queremos sobrescrever ou retornar um erro
+        # Por agora, vamos sobrescrever
+        pass
+    
+    # Timestamp atual
+    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Criar um objeto de dados para salvar
+    data = {
+        "order_number": order_number,
+        "supplier_name": supplier_name,
+        "timestamp": timestamp,
+        "observation": observation,
+        "verification_check": verification_check,
+        "setup_type": setup_type,
+        "audited": False,  # Inicialmente não auditado
+        "has_image": False  # Flag para indicar se tem imagem
+    }
+    
+    # Adicionar informações de produto e itens apenas para abastecimento
+    if setup_type == "supply" and product_code and product_name:
+        data["product_code"] = product_code
+        data["product_name"] = product_name
+        
+        # Adicionar PO do fornecedor para o produto se houver
+        if product_po:
+            data["product_po"] = product_po
+        
+        # Adicionar itens selecionados se houver
+        if selected_items and isinstance(selected_items, list):
+            data["selected_items"] = selected_items
+        else:
+            data["selected_items"] = []
+    
+    # Verificar se temos uma ou mais fotos
+    if photo_data:
+        # Garantir que photo_data seja uma string única (pegar apenas a primeira foto se for lista)
+        if isinstance(photo_data, list) and len(photo_data) > 0:
+            photo_base64 = photo_data[0]
+        else:
+            photo_base64 = photo_data
+        
+        try:
+            # Extrair apenas os dados da imagem (remover o cabeçalho se estiver presente)
+            if isinstance(photo_base64, str) and ',' in photo_base64:
+                photo_base64 = photo_base64.split(',')[1]
+            
+            # Decodificar os dados da imagem
+            photo_bytes = base64.b64decode(photo_base64)
+            
+            # Nome do arquivo da foto
+            photo_path = os.path.join(cell_dir, f"{order_number}_{setup_type}.jpg")
+            
+            # Abrir a imagem a partir dos bytes
+            img = Image.open(BytesIO(photo_bytes))
+            
+            # Converter para RGB se estiver em modo P (palette) ou outros modos
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Redimensionar se a imagem for muito grande
+            max_size = (1200, 1200)
+            img.thumbnail(max_size, Image.LANCZOS)
+            
+            # Salvar com qualidade reduzida
+            img.save(photo_path, format='JPEG', optimize=True, quality=85)
+            
+            # Atualizar flag de imagem
+            data["has_image"] = True
+            
+        except Exception as e:
+            logging.error(f"Error saving photo: {e}")
+            # Continuar mesmo sem a foto, apenas log do erro
+    
+    # Salvar o arquivo de texto com os dados
+    try:
+        with open(text_file_path, 'w') as f:
+            json.dump(data, f)
+        
+        return True, "Setup registrado com sucesso"
+    except Exception as e:
+        logging.error(f"Error saving setup data: {e}")
+        return False, f"Erro ao salvar dados do setup: {str(e)}"
+
+
+def get_all_setups():
+    """Get all setup data organized by cells."""
+    cells = {}
+    
+    # Verificar se o diretório de dados existe
+    if not os.path.exists(DATA_DIR):
+        return cells
+    
+    # Iterar por todos os subdiretórios (células)
+    for item in os.listdir(DATA_DIR):
+        item_path = os.path.join(DATA_DIR, item)
+        
+        if os.path.isdir(item_path) and not item.startswith('.'):
+            # Vamos considerar este como um diretório de célula
+            setups = []
+            
+            # Iterar por todos os arquivos de texto no diretório
+            for file in os.listdir(item_path):
+                if file.endswith('.txt') and not file.startswith('reset_log_'):
+                    txt_path = os.path.join(item_path, file)
+                    
+                    try:
+                        with open(txt_path, 'r') as f:
+                            setup_data = json.load(f)
+                            
+                            # Garantir order_number e setup_type a partir do nome do arquivo
+                            file_name_parts = file.replace('.txt', '').split('_')
+                            if len(file_name_parts) >= 2:
+                                order_number = file_name_parts[0]
+                                setup_type = file_name_parts[1]
+                                setup_data['order_number'] = order_number
+                                setup_data['setup_type'] = setup_type
+                            
+                            setups.append(setup_data)
+                    except (json.JSONDecodeError, FileNotFoundError) as e:
+                        logging.error(f"Error loading setup data from {txt_path}: {e}")
+            
+            cells[item] = setups
+    
+    return cells
+
+
+def update_setup(cell_name, order_number, supplier_name, observation, verification_check, audited=None, auditor_name=None, setup_type=None, photo_data=None, timestamp=None, audit_notes=None):
+    """Update an existing setup data file."""
+    # Para compatibilidade, tentamos primeiro o formato novo, depois o formato antigo
+    
+    # Se temos um tipo de setup específico, vamos usar esse conhecimento
+    if setup_type:
+        file_identifier = f"{order_number}_{setup_type}"
+        text_file_path = os.path.join(DATA_DIR, cell_name, f"{file_identifier}.txt")
+    else:
+        # Se não temos o tipo, vamos procurar arquivos com esse order_number
+        cell_dir = os.path.join(DATA_DIR, cell_name)
+        matching_files = []
+        
+        if os.path.isdir(cell_dir):
+            for file in os.listdir(cell_dir):
+                if file.endswith(".txt") and file.startswith(f"{order_number}"):
+                    matching_files.append(file)
+        
+        if not matching_files:
+            logging.error(f"Nenhum arquivo encontrado para order_number={order_number} na célula {cell_name}")
+            return False
+        
+        # Usar o primeiro arquivo encontrado
+        text_file_path = os.path.join(cell_dir, matching_files[0])
+    
+    try:
+        with open(text_file_path, 'r') as f:
+            data = json.load(f)
+        
+        # Update fields
+        data["supplier_name"] = supplier_name if supplier_name is not None else data.get("supplier_name", "")
+        data["observation"] = observation
+        data["verification_check"] = verification_check
+        
+        # Atualizar o timestamp se fornecido
+        if timestamp:
+            data["timestamp"] = timestamp
+        
+        # Update audit fields if provided
+        if audited is not None:
+            data["audited"] = audited
+            # Se estiver marcando como auditado, definir timestamp da auditoria
+            if audited and not data.get("audit_timestamp"):
+                data["audit_timestamp"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        if auditor_name is not None:
+            data["auditor_name"] = auditor_name
+            
+        # Adicionar anotações de auditoria, se fornecidas
+        if audit_notes is not None:
+            data["audit_notes"] = audit_notes
+        
+        # Garantir que o setup_type está definido
+        if setup_type and "setup_type" not in data:
+            data["setup_type"] = setup_type
+        
+        # Atualizar a foto se fornecida
+        if photo_data:
+            cell_dir = os.path.join(DATA_DIR, cell_name)
+            file_identifier = f"{order_number}_{data.get('setup_type', 'supply')}"
+            
+            # Verificar se photo_data é uma string única ou uma lista
+            if isinstance(photo_data, str):
+                photo_data_list = [photo_data]
+            elif isinstance(photo_data, list):
+                photo_data_list = photo_data
+            else:
+                photo_data_list = []
+            
+            # Processar apenas a primeira imagem no formato antigo
+            if photo_data_list:
+                photo_item = photo_data_list[0]
+                # Remove the "data:image/jpeg;base64," part
+                if "base64," in photo_item:
+                    photo_item = photo_item.split("base64,")[1]
+                    
+                try:
+                    # Decode photo data
+                    photo_bytes = base64.b64decode(photo_item)
+                    photo_path = os.path.join(cell_dir, f"{file_identifier}.jpg")
+                    
+                    # Processar imagem para reduzir tamanho
+                    from PIL import Image
+                    from io import BytesIO
+                    
+                    # Abrir a imagem a partir dos bytes
+                    img = Image.open(BytesIO(photo_bytes))
+                    
+                    # Converter para RGB se estiver em modo P (palette) ou outros modos
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # Redimensionar se a imagem for muito grande
+                    max_size = (1200, 1200)
+                    img.thumbnail(max_size, Image.LANCZOS)
+                    
+                    # Salvar com qualidade reduzida
+                    img.save(photo_path, format='JPEG', optimize=True, quality=85)
+                    
+                    # Marcar que tem imagem
+                    data["has_image"] = True
+                    
+                except Exception as e:
+                    logging.error(f"Error saving photo: {e}")
+                    # Não falhar completamente só por causa da foto
+        
+        with open(text_file_path, 'w') as f:
+            json.dump(data, f)
+            
+        return True
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        logging.error(f"Error updating setup: {e}")
+        return False
+
+
+def delete_setup(cell_name, order_number, setup_type):
+    """Delete a setup entry and its related image."""
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    
+    if not os.path.isdir(cell_dir):
+        return False
+    
+    # Identificar os arquivos a serem excluídos
+    file_identifier = f"{order_number}_{setup_type}"
+    text_file_path = os.path.join(cell_dir, f"{file_identifier}.txt")
+    image_file_path = os.path.join(cell_dir, f"{file_identifier}.jpg")
+    
+    success = True
+    
+    # Excluir o arquivo de texto
+    if os.path.exists(text_file_path):
+        try:
+            os.remove(text_file_path)
+        except Exception as e:
+            logging.error(f"Erro ao excluir arquivo de texto: {e}")
+            success = False
+    else:
+        success = False
+    
+    # Excluir a imagem (se existir)
+    if os.path.exists(image_file_path):
+        try:
+            os.remove(image_file_path)
+        except Exception as e:
+            logging.error(f"Erro ao excluir imagem: {e}")
+            success = False
+    
+    return success
+
+
+# Rota para atualizar o formato dos QR codes
+@app.route('/update_qrcodes_format')
+def update_qrcodes_format_route():
+    """Atualiza o formato dos QR codes para o novo formato com produtos."""
+    if not session.get('logged_in'):
+        return redirect(url_for('login', next=request.path))
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        flash('Acesso restrito. Apenas auditores podem acessar esta função.', 'danger')
+        return redirect(url_for('index'))
+    
+    try:
+        updated = update_qrcodes_format()
+        if updated:
+            flash('Formato dos QR codes atualizado com sucesso!', 'success')
+        else:
+            flash('Os QR codes já estão no formato mais recente.', 'info')
+    except Exception as e:
+        logging.error(f"Erro ao atualizar formato dos QR codes: {e}")
+        flash(f'Erro ao atualizar formato dos QR codes: {str(e)}', 'danger')
+    
+    return redirect(url_for('index'))
+
+
+@app.route('/')
+def index():
+    """Render the home page."""
+    username = session.get('username')
+    user_profile = 'visitor'  # Default perfil para não logados
+    
+    if username:
+        users = get_users()
+        user_profile = users.get(username, {}).get('profile', 'visitor')
+    
+    return render_template('index.html', user_profile=user_profile)
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Handle user login."""
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        logging.debug(f"Login attempt: username={username}")
+        
+        if authenticate_user(username, password):
+            logging.debug(f"Login successful for user: {username}")
+            session['logged_in'] = True
+            session['username'] = username
+            
+            # Add debug flash message for successful login
+            flash(f'Login bem-sucedido como {username}', 'success')
+            
+            next_page = request.args.get('next') or url_for('index')
+            logging.debug(f"Redirecting to: {next_page}")
+            return redirect(next_page)
+        else:
+            # Log login failure
+            logging.debug(f"Login failed for user: {username}")
+            flash('Usuário ou senha inválidos', 'danger')
+    
+    return render_template('login.html')
+
+
+@app.route('/cadastro_usuarios', methods=['GET', 'POST'])
+def cadastro_usuarios():
+    """Gerenciar usuários do sistema."""
+    # Verificar se o usuário está logado
+    if not session.get('logged_in'):
+        return redirect(url_for('login', next=request.path))
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        flash('Acesso restrito. Apenas auditores podem acessar esta página.', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        
+        if action == 'add':
+            # Adicionar novo usuário
+            username = request.form.get('username')
+            password = request.form.get('password')
+            profile = request.form.get('profile', 'auditor')  # Valor padrão é auditor
+            
+            if not username or not password:
+                flash('Usuário e senha são obrigatórios', 'danger')
+                return redirect(url_for('cadastro_usuarios'))
+            
+            # Verificar se o usuário já existe
+            users = get_users()
+            if username in users:
+                flash(f'Usuário {username} já existe', 'warning')
+            else:
+                add_user(username, password, profile)
+                flash(f'Usuário {username} adicionado com sucesso', 'success')
+                
+        elif action == 'edit':
+            # Editar usuário existente (senha e perfil)
+            username = request.form.get('username')
+            new_password = request.form.get('new_password')
+            profile = request.form.get('edit_profile')  # Novo campo para o perfil na edição
+            
+            if not username or not new_password:
+                flash('Nome de usuário e nova senha são obrigatórios', 'danger')
+                return redirect(url_for('cadastro_usuarios'))
+            
+            # Se não foi enviado um perfil, manter o perfil atual
+            if not profile:
+                users = get_users()
+                if username in users:
+                    profile = users[username].get('profile', 'auditor')
+            
+            add_user(username, new_password, profile)
+            flash(f'Usuário {username} atualizado com sucesso', 'success')
+            
+        elif action == 'delete':
+            # Excluir usuário
+            username = request.form.get('username')
+            
+            # Não permitir excluir o próprio usuário
+            if username == session.get('username'):
+                flash('Você não pode excluir seu próprio usuário', 'danger')
+                return redirect(url_for('cadastro_usuarios'))
+            
+            if delete_user(username):
+                flash(f'Usuário {username} excluído com sucesso', 'success')
+            else:
+                flash(f'Não foi possível excluir o usuário {username}', 'danger')
+    
+    # Obter lista atualizada de usuários
+    users = get_users()
+    return render_template('user_management.html', users=users)
+
+
+@app.route('/logout')
+def logout():
+    """Handle user logout."""
+    session.pop('logged_in', None)
+    session.pop('username', None)
+    flash('You have been logged out', 'success')
+    return redirect(url_for('index'))
+
+
+@app.route('/setup', methods=['GET', 'POST'])
+def setup():
+    """Handle setup registration."""
+    if not session.get('logged_in'):
+        return redirect(url_for('login', next=request.path))
+    
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if request.method == 'POST':
+        # Obter dados do formulário
+        cell_name = request.form.get('cell_name')
+        order_number = request.form.get('order_number')
+        supplier_name = request.form.get('supplier_name') or username
+        observation = request.form.get('observation', '')
+        verification_check = request.form.get('verification_check') == 'on'
+        setup_type = request.form.get('setup_type', 'supply')
+        photo_data_json = request.form.get('photo_data', '')
+        
+        # Obter dados específicos de produto e itens (para tipo de setup 'supply')
+        product_code = request.form.get('product_code')
+        product_name = request.form.get('product_name')
+        product_po = request.form.get('product_po')  # PO do fornecedor para o produto
+        selected_items_json = request.form.get('selected_items')
+        selected_items = []
+        
+        if selected_items_json:
+            try:
+                selected_items = json.loads(selected_items_json)
+            except json.JSONDecodeError:
+                selected_items = []
+        
+        # Validação básica
+        required_fields = [cell_name, order_number]
+        
+        # Validação específica para abastecimento
+        if setup_type == 'supply':
+            if product_code and product_name:
+                # Adicionar validação extra para produtos e itens
+                pass  # Opcional: validação adicional
+        
+        # Para todos os tipos, verificar o nome do abastecedor
+        if not supplier_name:
+            supplier_name = username
+            required_fields.append(supplier_name)
+            
+        if not all(required_fields):
+            flash('Todos os campos obrigatórios devem ser preenchidos', 'danger')
+            return redirect(url_for('setup'))
+        
+        # Converter string JSON para lista de imagens, se for JSON
+        try:
+            if photo_data_json.startswith('[') and photo_data_json.endswith(']'):
+                photo_data = json.loads(photo_data_json)
+            else:
+                # Se não for JSON, tratar como string única (formato antigo)
+                photo_data = photo_data_json
+        except json.JSONDecodeError:
+            # Se houve erro no parsing JSON, usar o texto original
+            photo_data = photo_data_json
+        
+        # Save setup data com tipo específico e informações de produto/itens
+        save_result, message = save_setup(
+            cell_name, 
+            order_number, 
+            supplier_name, 
+            photo_data, 
+            observation, 
+            verification_check,
+            product_code=product_code if setup_type == 'supply' else None,
+            product_name=product_name if setup_type == 'supply' else None,
+            product_po=product_po if setup_type == 'supply' else None,
+            selected_items=selected_items if setup_type == 'supply' else None,
+            setup_type=setup_type
+        )
+        
+        if save_result:
+            # Mensagem de sucesso específica para o tipo de setup
+            if setup_type == 'removal':
+                flash('Retirada de material registrada com sucesso!', 'success')
+            else:
+                flash('Abastecimento de material registrado com sucesso!', 'success')
+        else:
+            flash(f'Erro ao registrar setup: {message}', 'danger')
+            
+        return redirect(url_for('index'))
+    
+    qrcode = request.args.get('qrcode')
+    cell_name = get_cell_name(qrcode) if qrcode else None
+    
+    # Obter lista de produtos disponíveis para a célula
+    cell_products = []
+    
+    if qrcode:
+        # Vamos primeiro obter o nome da célula a partir do QR code
+        cell_name = get_cell_name(qrcode)
+        logging.debug(f"QR code {qrcode} maps to cell: {cell_name}")
+        
+        if cell_name:
+            # Vamos tentar uma abordagem diferente para obter produtos diretamente do JSON
+            qrcodes = get_qrcodes()
+            if qrcode in qrcodes:
+                qrcode_data = qrcodes[qrcode]
+                logging.debug(f"Dados encontrados para QR code {qrcode}: {json.dumps(qrcode_data, indent=2)}")
+                
+                if isinstance(qrcode_data, dict) and "products" in qrcode_data:
+                    cell_products = qrcode_data["products"]
+                    logging.debug(f"Produtos obtidos diretamente do QR code {qrcode}: {len(cell_products)}")
+                else:
+                    logging.debug(f"O QR code {qrcode} não tem produtos ou formato inválido")
+            
+            # Se não encontrou produtos diretamente, tentar pelo nome da célula
+            if not cell_products:
+                logging.debug(f"Tentando obter produtos pelo nome da célula {cell_name}")
+                cell_products = get_cell_products(cell_name)
+                logging.debug(f"Produtos obtidos pelo nome da célula {cell_name}: {len(cell_products)}")
+        else:
+            logging.warning(f"QR code {qrcode} não encontrado nos dados")
+    else:
+        logging.debug("Nenhum QR code fornecido")
+    
+    logging.debug(f"Produtos passados para o template: {json.dumps(cell_products, indent=2)}")
+    
+    return render_template('setup.html', 
+                          qrcode=qrcode, 
+                          cell_name=cell_name, 
+                          user_profile=user_profile, 
+                          username=username,
+                          cell_products=cell_products)
+
+
+@app.route('/api/check_setup_status')
+def check_setup_status():
+    """API para verificar o status dos setups para uma célula e ordem de produção específica.
+    
+    Verifica se já existem registros de retirada e abastecimento para a ordem.
+    """
+    cell_name = request.args.get('cell_name')
+    order_number = request.args.get('order_number')
+    
+    if not all([cell_name, order_number]):
+        return jsonify({
+            "success": False,
+            "message": "Célula e número de ordem são obrigatórios",
+            "has_removal": False,
+            "has_supply": False
+        }), 400
+    
+    # Verificar arquivos para a ordem na célula
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    has_removal = False
+    has_supply = False
+    
+    if os.path.isdir(cell_dir):
+        for file in os.listdir(cell_dir):
+            if file.endswith(".txt") and file.startswith(f"{order_number}_"):
+                file_path = os.path.join(cell_dir, file)
+                try:
+                    with open(file_path, 'r') as f:
+                        data = json.load(f)
+                    
+                    setup_type = data.get('setup_type', '')
+                    if setup_type == 'removal':
+                        has_removal = True
+                    elif setup_type == 'supply':
+                        has_supply = True
+                except:
+                    pass
+    
+    return jsonify({
+        "success": True,
+        "has_removal": has_removal,
+        "has_supply": has_supply,
+        "message": "Status verificado com sucesso"
+    })
+
+
+@app.route('/audit')
+def audit():
+    """Display the audit page."""
+    if not session.get('logged_in'):
+        return redirect(url_for('login', next=request.path))
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        flash('Acesso restrito. Apenas auditores podem acessar esta página.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Obter parâmetros de filtro
+    filter_date_start = request.args.get('filter_date_start', '')
+    filter_date_end = request.args.get('filter_date_end', '')
+    filter_auditor = request.args.get('filter_auditor', '')
+    filter_audited = request.args.get('filter_audited', '')
+    filter_order = request.args.get('filter_order', '')
+    filter_cell = request.args.get('filter_cell', '')
+    filter_supplier = request.args.get('filter_supplier', '')
+    
+    # Obter todos os setups
+    cells = get_all_setups()
+    
+    # Aplicar filtros, mas manter a estrutura original para o template
+    if any([filter_date_start, filter_date_end, filter_auditor, filter_audited, filter_order, filter_cell, filter_supplier]):
+        filtered_cells = {}
+        
+        for cell_name, setups in cells.items():
+            # Filtrar por nome da célula
+            if filter_cell and filter_cell.lower() not in cell_name.lower():
+                continue
+                
+            filtered_setups = []
+            for setup in setups:
+                # Filtrar por período de datas
+                setup_date = setup.get('timestamp', '').split(' ')[0]  # Extrair apenas a parte da data (YYYY-MM-DD)
+                
+                # Se data inicial está especificada e a data do setup é anterior
+                if filter_date_start and setup_date < filter_date_start:
+                    continue
+                    
+                # Se data final está especificada e a data do setup é posterior
+                if filter_date_end and setup_date > filter_date_end:
+                    continue
+                    
+                # Filtrar por auditor
+                if filter_auditor and filter_auditor.lower() not in setup.get('auditor_name', '').lower():
+                    continue
+                    
+                # Filtrar por abastecedor (novo)
+                if filter_supplier and filter_supplier.lower() not in setup.get('supplier_name', '').lower():
+                    continue
+                    
+                # Filtrar por status de auditoria
+                if filter_audited:
+                    is_audited = setup.get('audited', False)
+                    if (filter_audited == 'sim' and not is_audited) or (filter_audited == 'nao' and is_audited):
+                        continue
+                
+                # Filtrar por ordem de produção
+                if filter_order and filter_order.lower() not in setup.get('order_number', '').lower():
+                    continue
+                    
+                filtered_setups.append(setup)
+                
+            if filtered_setups:
+                filtered_cells[cell_name] = filtered_setups
+                
+        cells = filtered_cells
+    
+    return render_template('audit.html', cells=cells)
+
+
+@app.route('/register_qrcode', methods=['GET', 'POST'])
+def register_qrcode():
+    """Handle QR code registration."""
+    if not session.get('logged_in'):
+        return redirect(url_for('login', next=request.path))
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        flash('Acesso restrito. Apenas auditores podem acessar esta página.', 'danger')
+        return redirect(url_for('index'))
+    
+    if request.method == 'POST':
+        qrcode_value = request.form.get('qrcode_value')
+        cell_name = request.form.get('cell_name')
+        
+        if not all([qrcode_value, cell_name]):
+            flash('QR Code e nome da célula são obrigatórios', 'danger')
+            return redirect(url_for('register_qrcode'))
+        
+        save_qrcode(qrcode_value, cell_name)
+        flash('QR Code cadastrado com sucesso!', 'success')
+        return redirect(url_for('index'))
+    
+    return render_template('register_qrcode.html')
+
+
+@app.route('/api/get_cell_name/<qrcode>')
+def api_get_cell_name(qrcode):
+    """API endpoint to get cell name from QR code."""
+    # Permitir acesso até mesmo sem autenticação para facilitar o fluxo
+    # Isso é necessário para o funcionamento do script de carregamento de produtos
+    
+    cell_name = get_cell_name(qrcode)
+    logging.info(f"API get_cell_name: QR code={qrcode}, resultado={cell_name}")
+    
+    # Verificar se obteve um nome de célula válido
+    if cell_name is None:
+        return jsonify({"success": False, "message": "QR code não cadastrado"}), 404
+        
+    # Se chegou aqui, temos um nome de célula válido
+    logging.debug(f"API: QR code {qrcode} maps to cell: {cell_name}")
+    
+    # Verificar status de setup para a célula
+    setup_status = {
+        "removal": False,
+        "supply": False
+    }
+    
+    # Obter último número de ordem usado na célula (se houver)
+    most_recent_order = None
+    
+    # Verificar os arquivos na célula para determinar o status
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    if os.path.isdir(cell_dir):
+        for file in os.listdir(cell_dir):
+            if file.endswith(".txt"):
+                file_path = os.path.join(cell_dir, file)
+                try:
+                    with open(file_path, 'r') as f:
+                        setup_data = json.load(f)
+                    
+                    # Extrair informações relevantes
+                    order_number = setup_data.get('order_number')
+                    setup_type = setup_data.get('setup_type')
+                    
+                    # Atualizar most_recent_order se necessário
+                    if order_number and (most_recent_order is None or order_number > most_recent_order):
+                        most_recent_order = order_number
+                    
+                    # Atualizar status de setup
+                    if setup_type == 'removal':
+                        setup_status['removal'] = True
+                    elif setup_type == 'supply':
+                        setup_status['supply'] = True
+                        
+                except Exception as e:
+                    logging.error(f"Erro ao ler arquivo de setup {file_path}: {e}")
+    
+    # Retornar informações completas sobre a célula
+    return jsonify({
+        "success": True,
+        "cell_name": cell_name,
+        "setup_status": setup_status,
+        "most_recent_order": most_recent_order
+    })
+
+
+@app.route('/api/update_setup', methods=['POST'])
+def api_update_setup():
+    """API endpoint to update setup data."""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    data = request.json
+    success = update_setup(
+        data.get('cell_name'),
+        data.get('order_number'),
+        data.get('supplier_name'),
+        data.get('observation', ''),
+        data.get('verification_check', False),
+        data.get('audited'),
+        data.get('auditor_name'),
+        data.get('setup_type'),
+        data.get('photo_data'),
+        data.get('timestamp')
+    )
+    
+    if success:
+        return jsonify({"success": True})
+    return jsonify({"success": False, "message": "Erro ao atualizar setup"}), 500
+
+
+@app.route('/api/mark_as_audited', methods=['POST'])
+def api_mark_as_audited():
+    """API endpoint to mark or unmark a setup as audited."""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    data = request.json
+    auditor_name = session.get('username')
+    
+    # Verificar se é para marcar ou desmarcar
+    is_mark_action = data.get('is_mark', True)
+    audit_notes = data.get('audit_notes', '')
+    
+    # Verificar se o usuário tem perfil de auditor
+    users = get_users()
+    user_profile = users.get(auditor_name, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        return jsonify({"success": False, "message": "Somente auditores podem alterar o status de auditoria"}), 403
+    
+    # Se for para desmarcar, definimos como False e limpamos o nome do auditor
+    if not is_mark_action:
+        success = update_setup(
+            data.get('cell_name'),
+            data.get('order_number'),
+            data.get('supplier_name', ''),
+            data.get('observation', ''),
+            data.get('verification_check', False),
+            False,  # Desmarcar a auditoria
+            '',     # Limpar o nome do auditor
+            data.get('setup_type'),
+            None,   # Sem mudança na foto
+            None,   # Sem mudança no timestamp
+            ''      # Limpar anotações de auditoria
+        )
+        if success:
+            return jsonify({"success": True, "audited": False, "auditor_name": "", "audit_notes": ""})
+    # Caso contrário, marcamos como auditado normalmente
+    else:
+        success = update_setup(
+            data.get('cell_name'),
+            data.get('order_number'),
+            data.get('supplier_name', ''),
+            data.get('observation', ''),
+            data.get('verification_check', False),
+            True,  # Marcar como auditado
+            auditor_name,
+            data.get('setup_type'),
+            None,  # Sem mudança na foto
+            None,  # Sem mudança no timestamp
+            audit_notes  # Incluir anotações de auditoria
+        )
+        if success:
+            return jsonify({
+                "success": True, 
+                "audited": True, 
+                "auditor_name": auditor_name,
+                "audit_notes": audit_notes
+            })
+    
+    return jsonify({"success": False, "message": "Erro ao alterar status da auditoria"}), 500
+
+
+@app.route('/api/delete_setup', methods=['POST'])
+def api_delete_setup():
+    """API endpoint to delete a setup entry."""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    # Verificar se o usuário tem perfil de auditor
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        return jsonify({"success": False, "message": "Somente auditores podem excluir registros"}), 403
+    
+    data = request.json
+    cell_name = data.get('cell_name')
+    order_number = data.get('order_number')
+    setup_type = data.get('setup_type')
+    
+    if not all([cell_name, order_number, setup_type]):
+        return jsonify({"success": False, "message": "Dados incompletos para exclusão"}), 400
+    
+    success = delete_setup(cell_name, order_number, setup_type)
+    
+    if success:
+        return jsonify({"success": True, "message": "Registro excluído com sucesso"})
+    else:
+        return jsonify({"success": False, "message": "Erro ao excluir o registro"}), 500
+
+
+@app.route('/photos/<cell_name>/<path:filepath>')
+def get_photo(cell_name, filepath):
+    """Serve setup photos, including from subdirectories.
+    
+    Args:
+        cell_name: Nome da célula
+        filepath: Caminho do arquivo, pode incluir subdiretórios
+    """
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    
+    # Se filepath contém um subdiretório
+    if '/' in filepath:
+        subdir, filename = filepath.rsplit('/', 1)
+        return send_from_directory(os.path.join(cell_dir, subdir), filename)
+    else:
+        # Compatibilidade com formato antigo
+        return send_from_directory(cell_dir, filepath)
+
+
+def reset_cell_flow(cell_name, reason):
+    """Reset the flow of a cell without deleting records.
+    
+    Args:
+        cell_name: Nome da célula para resetar o fluxo
+        reason: Motivo para o reset do fluxo
+    
+    Returns:
+        bool: True se o reset foi bem-sucedido, False caso contrário
+        str: Mensagem de status
+    """
+    if not cell_name or not reason:
+        return False, "Célula e motivo são obrigatórios"
+    
+    try:
+        # Criar arquivo de log com o reset
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cell_dir = os.path.join(DATA_DIR, cell_name)
+        ensure_dir(cell_dir)
+        
+        # Criar um arquivo de registro do reset
+        reset_log_file = os.path.join(cell_dir, f"reset_log_{timestamp.replace(' ', '_').replace(':', '-')}.txt")
+        reset_data = {
+            "cell_name": cell_name,
+            "reset_timestamp": timestamp,
+            "reset_reason": reason,
+            "reset_by": session.get("username", "Unknown")
+        }
+        
+        with open(reset_log_file, 'w') as f:
+            json.dump(reset_data, f)
+        
+        return True, "Fluxo da célula resetado com sucesso"
+    except Exception as e:
+        logging.error(f"Erro ao resetar o fluxo da célula: {e}")
+        return False, f"Erro ao resetar célula: {str(e)}"
+        
+
+@app.route("/api/reset_cell", methods=["POST"])
+def api_reset_cell():
+    """API endpoint to reset the flow of a cell."""
+    # Verificar se o usuário está logado
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    # Verificar se o usuário tem perfil de auditor
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        return jsonify({"success": False, "message": "Somente auditores podem resetar o fluxo da célula"}), 403
+    
+    data = request.json
+    cell_name = data.get('cell_name')
+    reset_reason = data.get('reset_reason')
+    
+    if not cell_name or not reset_reason:
+        return jsonify({"success": False, "message": "Célula e motivo são obrigatórios"}), 400
+    
+    success, message = reset_cell_flow(cell_name, reset_reason)
+    
+    if success:
+        return jsonify({"success": True, "message": message})
+    else:
+        return jsonify({"success": False, "message": message}), 500
+
+
+@app.route('/camera_test')
+def camera_test():
+    """Página de teste para verificar o acesso à câmera."""
+    return render_template('camera_test.html')
+
+
+# Rota para a página de gerenciamento de produtos
+@app.route('/product_management')
+def product_management():
+    """Página de gerenciamento de produtos e itens para as células."""
+    if not session.get('logged_in'):
+        return redirect(url_for('login', next=request.path))
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        flash('Acesso restrito. Apenas auditores podem acessar esta página.', 'danger')
+        return redirect(url_for('index'))
+    
+    # Obter todas as células cadastradas
+    cells = get_all_cells()
+    
+    return render_template('product_management.html', cells=cells)
+
+
+# API para adicionar produto a uma célula
+@app.route('/api/add_product', methods=['POST'])
+def api_add_product():
+    """API para adicionar um produto a uma célula."""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        return jsonify({"success": False, "message": "Acesso restrito."}), 403
+    
+    # Obter dados da requisição
+    data = request.json
+    cell_name = data.get('cell_name')
+    product_code = data.get('product_code')
+    product_name = data.get('product_name')
+    
+    if not all([cell_name, product_code, product_name]):
+        return jsonify({"success": False, "message": "Todos os campos são obrigatórios"}), 400
+    
+    # Adicionar produto à célula
+    success = add_product_to_cell(cell_name, product_code, product_name)
+    
+    if success:
+        return jsonify({"success": True, "message": "Produto adicionado com sucesso"})
+    
+    return jsonify({"success": False, "message": "Erro ao adicionar produto. Célula não encontrada."}), 404
+
+
+# API para adicionar item a um produto
+@app.route('/api/add_item', methods=['POST'])
+def api_add_item():
+    """API para adicionar um item a um produto."""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        return jsonify({"success": False, "message": "Acesso restrito."}), 403
+    
+    # Obter dados da requisição
+    data = request.json
+    cell_name = data.get('cell_name')
+    product_code = data.get('product_code')
+    item_code = data.get('item_code')
+    item_name = data.get('item_name')
+    
+    if not all([cell_name, product_code, item_code, item_name]):
+        return jsonify({"success": False, "message": "Todos os campos são obrigatórios"}), 400
+    
+    # Adicionar item ao produto
+    success = add_item_to_product(cell_name, product_code, item_code, item_name)
+    
+    if success:
+        return jsonify({"success": True, "message": "Item adicionado com sucesso"})
+    
+    return jsonify({"success": False, "message": "Erro ao adicionar item. Célula ou produto não encontrado."}), 404
+
+
+# API para obter produtos de uma célula
+@app.route('/api/cell_products/<cell_name>')
+def api_cell_products(cell_name):
+    """API para obter produtos de uma célula."""
+    # Permitir acesso até mesmo sem autenticação para facilitar o fluxo
+    # Isso é necessário para o funcionamento do script de carregamento de produtos
+    
+    logging.info(f"API cell_products: Buscando produtos para célula={cell_name}")
+    
+    if not cell_name:
+        logging.error("API cell_products: Nome da célula está vazio")
+        return jsonify({
+            "success": False, 
+            "message": "Nome da célula não fornecido", 
+            "products": []
+        })
+    
+    # Obter produtos da célula
+    try:
+        products = get_cell_products(cell_name)
+        product_count = len(products)
+        
+        logging.info(f"API cell_products: {product_count} produtos encontrados para célula {cell_name}")
+        
+        # Log detalhado dos produtos (até 5 produtos para não sobrecarregar os logs)
+        if product_count > 0:
+            preview = products[:5]
+            logging.debug(f"API cell_products: Primeiros produtos encontrados: {json.dumps(preview, indent=2)}")
+        
+        return jsonify({
+            "success": True, 
+            "products": products,
+            "count": product_count,
+            "message": f"{product_count} produtos encontrados para célula {cell_name}"
+        })
+    except Exception as e:
+        logging.error(f"API cell_products: Erro ao buscar produtos: {str(e)}")
+        return jsonify({
+            "success": False, 
+            "message": f"Erro ao buscar produtos: {str(e)}", 
+            "products": []
+        })
+
+
+# API para obter itens de um produto
+@app.route('/api/product_items/<cell_name>/<product_code>')
+def api_product_items(cell_name, product_code):
+    """API para obter itens de um produto."""
+    # Permitir acesso até mesmo sem autenticação para facilitar o fluxo
+    # Isso é necessário para o funcionamento do script de carregamento de produtos
+    
+    logging.info(f"API product_items: Buscando itens para célula={cell_name}, produto={product_code}")
+    
+    if not cell_name or not product_code:
+        logging.error("API product_items: Nome da célula ou código do produto está vazio")
+        return jsonify({
+            "success": False, 
+            "message": "Nome da célula e código do produto são obrigatórios", 
+            "items": []
+        })
+    
+    # Obter itens do produto
+    try:
+        items = get_product_items(cell_name, product_code)
+        item_count = len(items)
+        
+        logging.info(f"API product_items: {item_count} itens encontrados para produto {product_code} na célula {cell_name}")
+        
+        # Log detalhado dos itens (até 5 itens para não sobrecarregar os logs)
+        if item_count > 0:
+            preview = items[:5]
+            logging.debug(f"API product_items: Primeiros itens encontrados: {json.dumps(preview, indent=2)}")
+        
+        return jsonify({
+            "success": True, 
+            "items": items,
+            "count": item_count,
+            "message": f"{item_count} itens encontrados para produto {product_code}"
+        })
+    except Exception as e:
+        logging.error(f"API product_items: Erro ao buscar itens: {str(e)}")
+        return jsonify({
+            "success": False, 
+            "message": f"Erro ao buscar itens: {str(e)}", 
+            "items": []
+        })
+
+
+# API para excluir um produto
+@app.route('/api/delete_product', methods=['POST'])
+def api_delete_product():
+    """API para excluir um produto."""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        return jsonify({"success": False, "message": "Acesso restrito."}), 403
+    
+    # Obter dados da requisição
+    data = request.json
+    cell_name = data.get('cell_name')
+    product_code = data.get('product_code')
+    
+    if not all([cell_name, product_code]):
+        return jsonify({"success": False, "message": "Célula e código do produto são obrigatórios"}), 400
+    
+    # Remover produto da célula
+    success = remove_product_from_cell(cell_name, product_code)
+    
+    if success:
+        return jsonify({"success": True, "message": "Produto excluído com sucesso"})
+    
+    return jsonify({"success": False, "message": "Erro ao excluir produto. Célula não encontrada."}), 404
+
+
+# API para excluir um item
+@app.route('/api/delete_item', methods=['POST'])
+def api_delete_item():
+    """API para excluir um item de um produto."""
+    if not session.get('logged_in'):
+        return jsonify({"success": False, "message": "Unauthorized"}), 401
+    
+    # Verificar se o usuário tem permissão (apenas auditores)
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        return jsonify({"success": False, "message": "Acesso restrito."}), 403
+    
+    # Obter dados da requisição
+    data = request.json
+    cell_name = data.get('cell_name')
+    product_code = data.get('product_code')
+    item_code = data.get('item_code')
+    
+    if not all([cell_name, product_code, item_code]):
+        return jsonify({"success": False, "message": "Célula, código do produto e código do item são obrigatórios"}), 400
+    
+    # Remover item do produto
+    success = remove_item_from_product(cell_name, product_code, item_code)
+    
+    if success:
+        return jsonify({"success": True, "message": "Item excluído com sucesso"})
+    
+    return jsonify({"success": False, "message": "Erro ao excluir item. Célula ou produto não encontrado."}), 404
+
+
+# Chamar a função de atualização do formato de QR codes ao iniciar
+with app.app_context():
+    update_qrcodes_format()
+
+
+# Inicializar o sistema
+init_data_files()
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

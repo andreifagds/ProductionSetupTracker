@@ -1,0 +1,132 @@
+/* Tema personalizado com cores verdes para o Sistema de Setup de Células */
+
+:root {
+    --primary-color: #198754;         /* Verde Bootstrap Success */
+    --primary-dark: #0f5132;         /* Verde Escuro */
+    --primary-light: #75b798;        /* Verde Claro */
+    --secondary-color: #20c997;      /* Verde Teal */
+    --secondary-light: #6edbb6;      /* Verde Teal Claro */
+    --accent-color: #38b000;         /* Verde Vibrante */
+    --danger-color: #dc3545;         /* Vermelho para alertas */
+    --warning-color: #ffc107;        /* Amarelo para avisos */
+    --success-color: #198754;        /* Verde para sucesso */
+    --info-color: #0dcaf0;           /* Ciano para informações */
+}
+
+/* Substituições para componentes Bootstrap */
+.bg-primary {
+    background-color: var(--primary-color) !important;
+}
+
+.bg-secondary {
+    background-color: var(--secondary-color) !important;
+}
+
+.text-primary {
+    color: var(--primary-color) !important;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover, .btn-primary:focus {
+    background-color: var(--primary-dark);
+    border-color: var(--primary-dark);
+}
+
+.btn-info {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+    color: white;
+}
+
+.btn-info:hover, .btn-info:focus {
+    background-color: #17a37e; /* Tom mais escuro do verde secundário */
+    border-color: #17a37e;
+    color: white;
+}
+
+.btn-outline-primary {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.btn-outline-primary:hover, .btn-outline-primary:focus {
+    background-color: var(--primary-color);
+}
+
+.btn-outline-info {
+    border-color: var(--secondary-color);
+    color: var(--secondary-color);
+}
+
+.btn-outline-info:hover, .btn-outline-info:focus {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+/* Cabeçalhos de cartões */
+.card-header {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card {
+    border-color: #333;
+}
+
+/* Estilizações específicas da aplicação */
+.app-header {
+    border-bottom: 3px solid var(--primary-light);
+}
+
+.app-title {
+    color: var(--primary-light);
+}
+
+.cell-name-header {
+    background-color: var(--primary-dark);
+    color: white;
+    padding: 8px 15px;
+    border-radius: 4px;
+    text-align: center;
+    margin-top: 5px;
+    font-weight: bold;
+}
+
+/* Estilizações para o scanner QR */
+#reader {
+    border: 2px solid var(--primary-color) !important;
+}
+
+.scanner-message.text-success {
+    color: var(--success-color) !important;
+}
+
+/* Elementos de formulário */
+.form-control:focus {
+    border-color: var(--primary-light);
+    box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25);
+}
+
+/* Links */
+a {
+    color: var(--secondary-color);
+}
+
+a:hover {
+    color: var(--secondary-light);
+}
+
+/* Ícone de anotações do auditor */
+.audit-notes-icon {
+    font-size: 1.1rem;
+    color: #17a2b8;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.audit-notes-icon:hover {
+    color: #fff;
+}

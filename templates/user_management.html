@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciamento de Usuários</title>
+    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+</head>
+<body>
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="display-5 mb-0"><i class="fas fa-users-cog text-primary me-2"></i> Gerenciamento de Usuários</h1>
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-home me-1"></i> Voltar para Home
+            </a>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-user-plus me-2"></i> Adicionar Usuário</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="addUserForm" action="{{ url_for('cadastro_usuarios') }}" method="POST">
+                            <input type="hidden" name="action" value="add">
+                            <div class="mb-3">
+                                <label for="newUsername" class="form-label">Nome de Usuário</label>
+                                <input type="text" class="form-control" id="newUsername" name="username" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="newPassword" class="form-label">Senha</label>
+                                <div class="input-group">
+                                    <input type="password" class="form-control" id="newPassword" name="password" required>
+                                    <button class="btn btn-outline-secondary toggle-password" type="button" data-target="newPassword">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Perfil do Usuário</label>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="profile" id="profileAuditor" value="auditor" checked>
+                                    <label class="form-check-label" for="profileAuditor">
+                                        <i class="fas fa-clipboard-check text-primary me-1"></i> Auditor
+                                        <small class="text-muted d-block">Acesso completo ao sistema (auditoria, cadastro de QR codes)</small>
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="profile" id="profileSupplier" value="supplier">
+                                    <label class="form-check-label" for="profileSupplier">
+                                        <i class="fas fa-dolly text-success me-1"></i> Abastecedor
+                                        <small class="text-muted d-block">Acesso limitado (apenas registro de setup)</small>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-plus-circle me-1"></i> Adicionar Usuário
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-users me-2"></i> Usuários Cadastrados</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if users %}
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Usuário</th>
+                                            <th>Perfil</th>
+                                            <th>Última Atualização</th>
+                                            <th class="text-end">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for username, user_data in users.items() %}
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="user-icon bg-secondary text-white rounded-circle me-2 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                                        <i class="fas fa-user"></i>
+                                                    </div>
+                                                    <span>{{ username }}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                {% if user_data.profile == 'auditor' %}
+                                                    <span class="badge bg-primary">
+                                                        <i class="fas fa-clipboard-check me-1"></i> Auditor
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-success">
+                                                        <i class="fas fa-dolly me-1"></i> Abastecedor
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if user_data.last_updated %}
+                                                    {{ user_data.last_updated }}
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-end">
+                                                <button class="btn btn-primary btn-sm edit-user-btn" data-bs-toggle="modal" data-bs-target="#editUserModal" data-username="{{ username }}" data-profile="{{ user_data.profile }}">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button class="btn btn-danger btn-sm delete-user-btn" data-bs-toggle="modal" data-bs-target="#deleteUserModal" data-username="{{ username }}">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i> Nenhum usuário cadastrado ainda.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="editUserModalLabel">Editar Usuário</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="editUserForm" action="{{ url_for('cadastro_usuarios') }}" method="POST">
+                    <div class="modal-body">
+                        <input type="hidden" name="action" value="edit">
+                        <input type="hidden" id="editUsername" name="username">
+                        
+                        <div class="mb-3">
+                            <label for="editNewPassword" class="form-label">Nova Senha</label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="editNewPassword" name="new_password" required>
+                                <button class="btn btn-outline-secondary toggle-password" type="button" data-target="editNewPassword">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Perfil do Usuário</label>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="radio" name="edit_profile" id="editProfileAuditor" value="auditor">
+                                <label class="form-check-label" for="editProfileAuditor">
+                                    <i class="fas fa-clipboard-check text-primary me-1"></i> Auditor
+                                    <small class="text-muted d-block">Acesso completo ao sistema (auditoria, cadastro de QR codes)</small>
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="edit_profile" id="editProfileSupplier" value="supplier">
+                                <label class="form-check-label" for="editProfileSupplier">
+                                    <i class="fas fa-dolly text-success me-1"></i> Abastecedor
+                                    <small class="text-muted d-block">Acesso limitado (apenas registro de setup)</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete User Modal -->
+    <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title" id="deleteUserModalLabel">Confirmar Exclusão</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Tem certeza que deseja excluir o usuário <strong id="deleteUserName"></strong>?</p>
+                    <p class="text-danger"><i class="fas fa-exclamation-triangle me-2"></i> Esta ação não pode ser desfeita.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <form id="deleteUserForm" action="{{ url_for('cadastro_usuarios') }}" method="POST">
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" id="deleteUsername" name="username">
+                        <button type="submit" class="btn btn-danger">Excluir</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Para mostrar/esconder senhas
+        document.querySelectorAll('.toggle-password').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const passwordInput = document.getElementById(targetId);
+                
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    this.innerHTML = '<i class="fas fa-eye-slash"></i>';
+                } else {
+                    passwordInput.type = 'password';
+                    this.innerHTML = '<i class="fas fa-eye"></i>';
+                }
+            });
+        });
+
+        // Para preencher o modal de edição
+        document.querySelectorAll('.edit-user-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const username = this.getAttribute('data-username');
+                const profile = this.getAttribute('data-profile') || 'auditor';
+                
+                document.getElementById('editUsername').value = username;
+                document.getElementById('editUserModalLabel').textContent = `Editar Usuário: ${username}`;
+                
+                // Definir o perfil correto nos radio buttons
+                if (profile === 'auditor') {
+                    document.getElementById('editProfileAuditor').checked = true;
+                } else {
+                    document.getElementById('editProfileSupplier').checked = true;
+                }
+            });
+        });
+
+        // Para preencher o modal de exclusão
+        document.querySelectorAll('.delete-user-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const username = this.getAttribute('data-username');
+                document.getElementById('deleteUsername').value = username;
+                document.getElementById('deleteUserName').textContent = username;
+            });
+        });
+    </script>
+</body>
+</html>

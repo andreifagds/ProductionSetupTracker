@@ -1,0 +1,472 @@
+/**
+ * Script para funcionalidade do modal de detalhes na página de auditoria
+ */
+
+// Função para registrar logs de depuração
+function debugLog(message, data = null) {
+    if (data) {
+        console.log(`[DEBUG] ${message}`, data);
+    } else {
+        console.log(`[DEBUG] ${message}`);
+    }
+}
+
+// Função para limpar backdrop e classes modais
+function clearModalBackdrop() {
+    setTimeout(() => {
+        document.querySelectorAll(".modal-backdrop").forEach(backdrop => {
+            backdrop.remove();
+        });
+        document.body.classList.remove("modal-open");
+        document.body.style.overflow = "";
+        document.body.style.paddingRight = "";
+    }, 200);
+}
+
+// Função para abrir o modal de detalhes do setup
+function openSetupDetailsModal(setupDetails, cellName) {
+    debugLog("Abrindo modal de detalhes", { setupDetails, cellName });
+    
+    try {
+        // Tentar converter setupDetails para objeto se for string
+        let setupDetailsObj;
+        
+        if (typeof setupDetails === 'string') {
+            try {
+                setupDetailsObj = JSON.parse(setupDetails);
+                debugLog("ParsedObj", setupDetailsObj);
+            } catch (parseError) {
+                console.error("Erro ao fazer parse do JSON:", parseError, "Dados recebidos:", setupDetails);
+                alert("Erro ao processar dados. Por favor, tente novamente ou contate o suporte.");
+                return;
+            }
+        } else {
+            setupDetailsObj = setupDetails;
+        }
+        
+        // Formatação do tipo de setup
+        const setupTypeFormatted = setupDetailsObj.setup_type === 'removal' ? 
+            '<span class="badge bg-danger px-3 py-2"><i class="fa fa-minus-circle me-1"></i> Retirada</span>' : 
+            '<span class="badge bg-primary px-3 py-2"><i class="fa fa-plus-circle me-1"></i> Abastecimento</span>';
+        
+        // Formatação do status de auditoria
+        const auditStatusFormatted = setupDetailsObj.audited ? 
+            '<span class="badge bg-success px-3 py-2"><i class="fa fa-check-circle me-1"></i> Auditado</span>' : 
+            '<span class="badge bg-warning text-dark px-3 py-2"><i class="fa fa-clock-o me-1"></i> Pendente</span>';
+        
+        // Formatação do status de verificação
+        const verificationStatusFormatted = setupDetailsObj.verification_check ? 
+            '<span class="badge bg-success"><i class="fa fa-check-circle me-1"></i> Verificado</span>' : 
+            '<span class="badge bg-danger"><i class="fa fa-times-circle me-1"></i> Não Verificado</span>';
+        
+        // Construir conteúdo do modal
+        let content = `
+            <div class="setup-details-header mb-4">
+                <div class="row align-items-center">
+                    <div class="col-md-7">
+                        <div class="d-flex align-items-center mb-3">
+                            <h4 class="mb-0 me-3">OP: ${setupDetailsObj.order_number}</h4>
+                            ${auditStatusFormatted}
+                        </div>
+                        <div class="info-block mb-2">
+                            <span class="text-muted me-2">Célula:</span>
+                            <span class="badge bg-secondary px-3 py-2">${cellName}</span>
+                        </div>
+                        <div class="info-block mb-2">
+                            <span class="text-muted me-2">Tipo:</span>
+                            ${setupTypeFormatted}
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body p-3">
+                                <div class="info-block mb-2">
+                                    <i class="fa fa-user text-muted me-2"></i>
+                                    <span class="text-muted">Abastecedor:</span>
+                                    <span class="fw-bold ms-2">${setupDetailsObj.supplier_name}</span>
+                                </div>
+                                <div class="info-block mb-2">
+                                    <i class="fa fa-calendar text-muted me-2"></i>
+                                    <span class="text-muted">Data/Hora:</span>
+                                    <span class="fw-bold ms-2">${setupDetailsObj.timestamp.replace(/_/g, ' ')}</span>
+                                </div>
+                                <div class="info-block">
+                                    <i class="fa fa-check-square-o text-muted me-2"></i>
+                                    <span class="text-muted">Verificação:</span>
+                                    <span class="ms-2">${verificationStatusFormatted}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Adicionar informações de auditoria se o setup foi auditado
+        if (setupDetailsObj.audited) {
+            content += `
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-header bg-dark border-secondary">
+                                <h6 class="mb-0"><i class="fa fa-clipboard-check me-2"></i> Informações da Auditoria</h6>
+                            </div>
+                            <div class="card-body p-3">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="info-block mb-2">
+                                            <i class="fa fa-user text-muted me-2"></i>
+                                            <span class="text-muted">Auditor:</span>
+                                            <span class="fw-bold ms-2">${setupDetailsObj.auditor_name || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="info-block mb-2">
+                                            <i class="fa fa-calendar text-muted me-2"></i>
+                                            <span class="text-muted">Data/Hora da Auditoria:</span>
+                                            <span class="fw-bold ms-2">${setupDetailsObj.audit_timestamp || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-md-12">
+                                        <div class="info-block">
+                                            <i class="fa fa-commenting text-muted me-2"></i>
+                                            <span class="text-muted">Anotações da Auditoria:</span>
+                                            <div class="mt-2 p-2 bg-dark rounded">
+                                                ${setupDetailsObj.audit_notes ? 
+                                                    setupDetailsObj.audit_notes.replace(/\n/g, '<br>') : 
+                                                    '<em class="text-muted">Nenhuma anotação.</em>'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Adicionar informações do produto se for de abastecimento
+        if (setupDetailsObj.setup_type === 'supply' && setupDetailsObj.product_code) {
+            content += `
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-header bg-dark border-secondary">
+                                <h6 class="mb-0"><i class="fa fa-box me-2"></i> Informações do Produto</h6>
+                            </div>
+                            <div class="card-body p-3">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="info-block mb-2">
+                                            <i class="fa fa-barcode text-muted me-2"></i>
+                                            <span class="text-muted">Código do Produto:</span>
+                                            <span class="fw-bold ms-2">${setupDetailsObj.product_code}</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="info-block mb-2">
+                                            <i class="fa fa-tag text-muted me-2"></i>
+                                            <span class="text-muted">Nome do Produto:</span>
+                                            <span class="fw-bold ms-2">${setupDetailsObj.product_name || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row mt-2">
+                                    <div class="col-md-6">
+                                        <div class="info-block">
+                                            <i class="fa fa-file-text text-muted me-2"></i>
+                                            <span class="text-muted">PO do Fornecedor:</span>
+                                            <span class="fw-bold ms-2">${setupDetailsObj.product_po || 'N/A'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Verificar se há itens selecionados
+            if (setupDetailsObj.selected_items && Array.isArray(setupDetailsObj.selected_items) && setupDetailsObj.selected_items.length > 0) {
+                content += `
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card bg-dark border-secondary">
+                                <div class="card-header bg-dark border-secondary">
+                                    <h6 class="mb-0"><i class="fa fa-list me-2"></i> Itens Selecionados (${setupDetailsObj.selected_items.length})</h6>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-dark">
+                                            <thead>
+                                                <tr>
+                                                    <th scope="col">#</th>
+                                                    <th scope="col">Código</th>
+                                                    <th scope="col">Nome</th>
+                                                    <th scope="col">PO do Fornecedor</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                ${setupDetailsObj.selected_items.map((item, index) => `
+                                                    <tr>
+                                                        <td>${index + 1}</td>
+                                                        <td>${item.item_code}</td>
+                                                        <td>${item.item_name}</td>
+                                                        <td>${item.supplier_po || 'N/A'}</td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Adicionar campo de observações
+        content += `
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card bg-dark border-secondary">
+                        <div class="card-header bg-dark border-secondary">
+                            <h6 class="mb-0"><i class="fa fa-sticky-note me-2"></i> Observações</h6>
+                        </div>
+                        <div class="card-body p-3">
+                            ${setupDetailsObj.observation ? 
+                                setupDetailsObj.observation.replace(/\n/g, '<br>') : 
+                                '<em class="text-muted">Nenhuma observação.</em>'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Verificar e exibir imagens em um carrossel
+        const hasImages = setupDetailsObj.images && Array.isArray(setupDetailsObj.images) && setupDetailsObj.images.length > 0;
+        const hasMainImage = setupDetailsObj.main_image;
+        
+        if (hasImages || hasMainImage) {
+            // Montar URLs completas para as imagens
+            let imageUrls = [];
+            
+            if (hasImages) {
+                imageUrls = setupDetailsObj.images.map(img => {
+                    // Verificar se temos um objeto com path, ou apenas o caminho
+                    const imgPath = typeof img === 'object' ? img.path : img;
+                    return `/photos/${cellName}/${imgPath}`;
+                });
+            } else if (hasMainImage) {
+                imageUrls = [`/photos/${cellName}/${setupDetailsObj.main_image}`];
+            }
+            
+            // Criar um carrossel de imagens
+            if (imageUrls.length > 0) {
+                const carouselId = `setupImagesCarousel-${Date.now()}`;
+                
+                content += `
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card bg-dark border-secondary">
+                                <div class="card-header bg-dark border-secondary">
+                                    <h6 class="mb-0"><i class="fa fa-camera me-2"></i> Fotos (${imageUrls.length})</h6>
+                                </div>
+                                <div class="card-body p-3">
+                                    <div id="${carouselId}" class="carousel slide" data-bs-ride="carousel">
+                                        <div class="carousel-indicators">
+                                            ${imageUrls.map((_, index) => `
+                                                <button type="button" data-bs-target="#${carouselId}" 
+                                                    data-bs-slide-to="${index}" 
+                                                    ${index === 0 ? 'class="active" aria-current="true"' : ''} 
+                                                    aria-label="Slide ${index + 1}">
+                                                </button>
+                                            `).join('')}
+                                        </div>
+                                        <div class="carousel-inner">
+                                            ${imageUrls.map((photo, index) => `
+                                                <div class="carousel-item ${index === 0 ? 'active' : ''}">
+                                                    <div class="photo-container position-relative text-center">
+                                                        <img src="${photo}" class="img-fluid rounded setup-photo" 
+                                                            style="max-height: 400px; width: auto; margin: 0 auto;" 
+                                                            alt="Foto do setup ${index + 1}">
+                                                        <div class="photo-number position-absolute top-0 start-0 m-2 bg-dark bg-opacity-75 rounded px-2 py-1">
+                                                            Foto ${index + 1} de ${imageUrls.length}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        ${imageUrls.length > 1 ? `
+                                            <button class="carousel-control-prev" type="button" data-bs-target="#${carouselId}" data-bs-slide="prev">
+                                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                                <span class="visually-hidden">Anterior</span>
+                                            </button>
+                                            <button class="carousel-control-next" type="button" data-bs-target="#${carouselId}" data-bs-slide="next">
+                                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                                <span class="visually-hidden">Próximo</span>
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        // Inserir conteúdo no modal
+        document.getElementById('setupDetailsContent').innerHTML = content;
+        
+        // Adicionar botões de ação específicos baseados no estado do setup
+        const modalFooter = document.getElementById('setupDetailsFooter');
+        let footerContent = '';
+        
+        // Botão para fechar o modal sempre presente
+        footerContent += `<button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Fechar</button>`;
+        
+        // Botão para desmarcar como auditado (se já estiver auditado)
+        if (setupDetailsObj.audited) {
+            footerContent += `
+                <button type="button" class="btn btn-warning" 
+                    onclick="unmarkAsAudited('${cellName}', '${setupDetailsObj.order_number}', '${setupDetailsObj.setup_type}', '${setupDetailsObj.supplier_name}', ${setupDetailsObj.verification_check})">
+                    <i class="fa fa-times-circle me-1"></i> Desmarcar Auditoria
+                </button>
+            `;
+        }
+        
+        // Botão para excluir setup
+        footerContent += `
+            <button type="button" class="btn btn-danger ms-auto" 
+                onclick="deleteSetup('${cellName}', '${setupDetailsObj.order_number}', '${setupDetailsObj.setup_type}')">
+                <i class="fa fa-trash me-1"></i> Excluir
+            </button>
+        `;
+        
+        // Atualizar o rodapé
+        modalFooter.innerHTML = footerContent;
+        
+        // Exibir o modal
+        const setupDetailsModalEl = document.getElementById('setupDetailsModal');
+        const setupDetailsModal = new bootstrap.Modal(setupDetailsModalEl);
+        setupDetailsModal.show();
+        
+    } catch (error) {
+        console.error("Erro ao exibir o modal de detalhes:", error);
+        alert("Ocorreu um erro ao exibir os detalhes. Por favor, tente novamente.");
+    }
+}
+
+// Configurar os eventos do modal quando o documento estiver pronto
+function setupModalEventListeners() {
+    // Ao ocultar o modal, garantir que não fique backdrop residual
+    const setupDetailsModalEl = document.getElementById('setupDetailsModal');
+    if (setupDetailsModalEl) {
+        setupDetailsModalEl.addEventListener('hidden.bs.modal', function () {
+            clearModalBackdrop();
+        });
+    }
+}
+
+// Função para desmarcar um setup como auditado
+function unmarkAsAudited(cellName, orderNumber, setupType, supplierName, verificationCheck) {
+    if (!confirm("Tem certeza que deseja desmarcar este setup como auditado?")) {
+        return;
+    }
+    
+    console.log("Desmarcando como auditado:", {
+        cellName, orderNumber, setupType, supplierName, verificationCheck
+    });
+    
+    // Preparar os dados para a requisição
+    const requestData = {
+        cell_name: cellName,
+        order_number: orderNumber,
+        setup_type: setupType,
+        supplier_name: supplierName,
+        verification_check: verificationCheck,
+        is_mark: false  // Indica que estamos desmarcando
+    };
+    
+    // Fazer a requisição para a API
+    fetch('/api/mark_as_audited', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert("Setup desmarcado como auditado com sucesso!");
+            // Fechar o modal e atualizar a página
+            const modal = bootstrap.Modal.getInstance(document.getElementById('setupDetailsModal'));
+            if (modal) modal.hide();
+            // Atualizar a página
+            location.reload();
+        } else {
+            alert("Erro ao desmarcar setup: " + (data.message || "Erro desconhecido"));
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao desmarcar setup:', error);
+        alert("Ocorreu um erro ao processar a solicitação.");
+    });
+}
+
+// Função para excluir um setup
+function deleteSetup(cellName, orderNumber, setupType) {
+    if (!confirm("ATENÇÃO: Esta ação não pode ser desfeita! Tem certeza que deseja excluir este setup?")) {
+        return;
+    }
+    
+    if (!confirm("Por favor, confirme novamente: Você realmente deseja EXCLUIR PERMANENTEMENTE este registro?")) {
+        return;
+    }
+    
+    console.log("Excluindo setup:", { cellName, orderNumber, setupType });
+    
+    // Preparar os dados para a requisição
+    const requestData = {
+        cell_name: cellName,
+        order_number: orderNumber,
+        setup_type: setupType
+    };
+    
+    // Fazer a requisição para a API
+    fetch('/api/delete_setup', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert("Setup excluído com sucesso!");
+            // Fechar o modal e atualizar a página
+            const modal = bootstrap.Modal.getInstance(document.getElementById('setupDetailsModal'));
+            if (modal) modal.hide();
+            // Atualizar a página
+            location.reload();
+        } else {
+            alert("Erro ao excluir setup: " + (data.message || "Erro desconhecido"));
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao excluir setup:', error);
+        alert("Ocorreu um erro ao processar a solicitação.");
+    });
+}
+
+// Configurar os listeners quando o documento estiver pronto
+document.addEventListener('DOMContentLoaded', function() {
+    setupModalEventListeners();
+});

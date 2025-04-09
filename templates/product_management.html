@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciamento de Produtos | Sistema de Setup de Células</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/custom-green-theme.css') }}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <style>
+        .product-list, .item-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .cell-select-container {
+            background-color: var(--bs-dark);
+            border-radius: 0.25rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .product-card, .item-card {
+            margin-bottom: 0.75rem;
+            background-color: var(--bs-dark);
+        }
+        .delete-btn {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container main-container">
+        <!-- Header -->
+        <div class="app-header">
+            <h1 class="app-title">Gerenciamento de Produtos</h1>
+            <p class="app-subtitle">Adicione e gerencie produtos e itens por célula de produção</p>
+        </div>
+
+        <!-- Back button -->
+        <div class="back-button">
+            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                <i class="fa fa-arrow-left me-2"></i> Voltar
+            </a>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Cell Selection -->
+        <div class="cell-select-container">
+            <div class="row align-items-center">
+                <div class="col-md-4">
+                    <label for="cellSelect" class="form-label">Selecione uma Célula:</label>
+                </div>
+                <div class="col-md-8">
+                    <select id="cellSelect" class="form-select">
+                        <option value="">Selecione uma célula...</option>
+                        {% for cell in cells %}
+                        <option value="{{ cell.cell_name }}">{{ cell.cell_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Product Management -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Produtos da Célula</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-4">
+                            <h6>Adicionar Novo Produto</h6>
+                            <form id="addProductForm">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <input type="text" class="form-control" id="productCode" placeholder="Código" required>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" id="productName" placeholder="Nome do Produto" required>
+                                            <button type="submit" class="btn btn-success">
+                                                <i class="fa fa-plus"></i> Adicionar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div id="productListContainer">
+                            <div id="noCellMessage" class="alert alert-info">
+                                <i class="fa fa-info-circle me-2"></i> Selecione uma célula para gerenciar produtos
+                            </div>
+                            <div id="noProductsMessage" class="alert alert-warning" style="display: none;">
+                                <i class="fa fa-exclamation-triangle me-2"></i> Nenhum produto cadastrado para esta célula
+                            </div>
+                            <div class="product-list" id="productList" style="display: none;">
+                                <!-- Products will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Item Management -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Itens do Produto</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="noProductSelectedMessage" class="alert alert-info">
+                            <i class="fa fa-info-circle me-2"></i> Selecione uma célula e um produto para gerenciar itens
+                        </div>
+                        
+                        <div id="itemManagementContainer" style="display: none;">
+                            <div class="mb-4">
+                                <h6>Adicionar Novo Item</h6>
+                                <form id="addItemForm">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <input type="text" class="form-control" id="itemCode" placeholder="Código" required>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="itemName" placeholder="Nome do Item" required>
+                                                <button type="submit" class="btn btn-success">
+                                                    <i class="fa fa-plus"></i> Adicionar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                            
+                            <hr>
+                            
+                            <div id="noItemsMessage" class="alert alert-warning" style="display: none;">
+                                <i class="fa fa-exclamation-triangle me-2"></i> Nenhum item cadastrado para este produto
+                            </div>
+                            <div class="item-list" id="itemList" style="display: none;">
+                                <!-- Items will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Confirmation Modal -->
+    <div class="modal fade" id="confirmDeleteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Confirmar Exclusão</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="deleteConfirmationMessage">Tem certeza que deseja excluir este item?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Excluir</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elementos do DOM
+            const cellSelect = document.getElementById('cellSelect');
+            const productListContainer = document.getElementById('productListContainer');
+            const noCellMessage = document.getElementById('noCellMessage');
+            const noProductsMessage = document.getElementById('noProductsMessage');
+            const productList = document.getElementById('productList');
+            const addProductForm = document.getElementById('addProductForm');
+            const productCode = document.getElementById('productCode');
+            const productName = document.getElementById('productName');
+            
+            const noProductSelectedMessage = document.getElementById('noProductSelectedMessage');
+            const itemManagementContainer = document.getElementById('itemManagementContainer');
+            const noItemsMessage = document.getElementById('noItemsMessage');
+            const itemList = document.getElementById('itemList');
+            const addItemForm = document.getElementById('addItemForm');
+            const itemCode = document.getElementById('itemCode');
+            const itemName = document.getElementById('itemName');
+            
+            const confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+            const deleteConfirmationMessage = document.getElementById('deleteConfirmationMessage');
+            const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+            
+            // Variáveis globais
+            let currentCell = '';
+            let currentProduct = '';
+            let deleteItemType = ''; // 'product' ou 'item'
+            let deleteItemData = {};
+            
+            // Manipuladores de eventos
+            cellSelect.addEventListener('change', function() {
+                currentCell = this.value;
+                currentProduct = '';
+                
+                if (currentCell) {
+                    noCellMessage.style.display = 'none';
+                    loadProducts(currentCell);
+                } else {
+                    noCellMessage.style.display = 'block';
+                    productList.style.display = 'none';
+                    noProductsMessage.style.display = 'none';
+                }
+                
+                // Reset item section
+                noProductSelectedMessage.style.display = 'block';
+                itemManagementContainer.style.display = 'none';
+            });
+            
+            addProductForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                if (!currentCell) {
+                    alert('Selecione uma célula primeiro!');
+                    return;
+                }
+                
+                const productCodeValue = productCode.value.trim();
+                const productNameValue = productName.value.trim();
+                
+                if (productCodeValue && productNameValue) {
+                    addProduct(currentCell, productCodeValue, productNameValue);
+                }
+            });
+            
+            addItemForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                if (!currentCell || !currentProduct) {
+                    alert('Selecione uma célula e um produto primeiro!');
+                    return;
+                }
+                
+                const itemCodeValue = itemCode.value.trim();
+                const itemNameValue = itemName.value.trim();
+                
+                if (itemCodeValue && itemNameValue) {
+                    addItem(currentCell, currentProduct, itemCodeValue, itemNameValue);
+                }
+            });
+            
+            confirmDeleteBtn.addEventListener('click', function() {
+                if (deleteItemType === 'product') {
+                    deleteProduct(deleteItemData.cell, deleteItemData.code);
+                } else if (deleteItemType === 'item') {
+                    deleteItem(deleteItemData.cell, deleteItemData.productCode, deleteItemData.itemCode);
+                }
+                
+                confirmDeleteModal.hide();
+            });
+            
+            // Funções auxiliares
+            function loadProducts(cellName) {
+                fetch(`/api/cell_products/${cellName}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            if (data.products && data.products.length > 0) {
+                                displayProducts(data.products);
+                            } else {
+                                productList.style.display = 'none';
+                                noProductsMessage.style.display = 'block';
+                            }
+                        } else {
+                            console.error('Erro ao carregar produtos:', data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro na requisição:', error);
+                    });
+            }
+            
+            function displayProducts(products) {
+                productList.innerHTML = '';
+                
+                products.forEach(product => {
+                    const productCard = document.createElement('div');
+                    productCard.className = 'card product-card';
+                    productCard.innerHTML = `
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>${product.code}</strong> - ${product.name}
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-info view-items-btn me-1" 
+                                            data-product-code="${product.code}" 
+                                            data-product-name="${product.name}">
+                                        <i class="fa fa-list"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger delete-product-btn" 
+                                            data-product-code="${product.code}" 
+                                            data-product-name="${product.name}">
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    productList.appendChild(productCard);
+                    
+                    // Adicionar listeners para os botões
+                    const viewItemsBtn = productCard.querySelector('.view-items-btn');
+                    viewItemsBtn.addEventListener('click', function() {
+                        const productCode = this.getAttribute('data-product-code');
+                        const productName = this.getAttribute('data-product-name');
+                        selectProduct(productCode, productName);
+                    });
+                    
+                    const deleteProductBtn = productCard.querySelector('.delete-product-btn');
+                    deleteProductBtn.addEventListener('click', function() {
+                        const productCode = this.getAttribute('data-product-code');
+                        const productName = this.getAttribute('data-product-name');
+                        confirmDeleteProduct(productCode, productName);
+                    });
+                });
+                
+                productList.style.display = 'block';
+                noProductsMessage.style.display = 'none';
+            }
+            
+            function selectProduct(productCode, productName) {
+                currentProduct = productCode;
+                
+                // Atualizar interface
+                noProductSelectedMessage.style.display = 'none';
+                itemManagementContainer.style.display = 'block';
+                
+                // Destacar o produto selecionado
+                document.querySelectorAll('.product-card').forEach(card => {
+                    card.classList.remove('border-primary');
+                });
+                
+                document.querySelectorAll(`.view-items-btn[data-product-code="${productCode}"]`).forEach(btn => {
+                    btn.closest('.product-card').classList.add('border-primary');
+                });
+                
+                // Carregar itens do produto
+                loadItems(currentCell, currentProduct);
+            }
+            
+            function loadItems(cellName, productCode) {
+                fetch(`/api/product_items/${cellName}/${productCode}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            if (data.items && data.items.length > 0) {
+                                displayItems(data.items);
+                            } else {
+                                itemList.style.display = 'none';
+                                noItemsMessage.style.display = 'block';
+                            }
+                        } else {
+                            console.error('Erro ao carregar itens:', data.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro na requisição:', error);
+                    });
+            }
+            
+            function displayItems(items) {
+                itemList.innerHTML = '';
+                
+                items.forEach(item => {
+                    const itemCard = document.createElement('div');
+                    itemCard.className = 'card item-card';
+                    itemCard.innerHTML = `
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>${item.code}</strong> - ${item.name}
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-danger delete-item-btn" 
+                                            data-item-code="${item.code}" 
+                                            data-item-name="${item.name}">
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    itemList.appendChild(itemCard);
+                    
+                    // Adicionar listener para o botão de excluir
+                    const deleteItemBtn = itemCard.querySelector('.delete-item-btn');
+                    deleteItemBtn.addEventListener('click', function() {
+                        const itemCode = this.getAttribute('data-item-code');
+                        const itemName = this.getAttribute('data-item-name');
+                        confirmDeleteItem(itemCode, itemName);
+                    });
+                });
+                
+                itemList.style.display = 'block';
+                noItemsMessage.style.display = 'none';
+            }
+            
+            function addProduct(cellName, productCode, productName) {
+                fetch('/api/add_product', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        cell_name: cellName,
+                        product_code: productCode,
+                        product_name: productName
+                    }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Limpar formulário
+                        productCode.value = '';
+                        productName.value = '';
+                        
+                        // Recarregar lista de produtos
+                        loadProducts(cellName);
+                        
+                        // Mostrar mensagem de sucesso
+                        alert('Produto adicionado com sucesso!');
+                    } else {
+                        alert(`Erro: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro na requisição:', error);
+                    alert('Erro ao adicionar produto. Verifique o console para mais detalhes.');
+                });
+            }
+            
+            function addItem(cellName, productCode, itemCode, itemName) {
+                fetch('/api/add_item', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        cell_name: cellName,
+                        product_code: productCode,
+                        item_code: itemCode,
+                        item_name: itemName
+                    }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Limpar formulário
+                        itemCode.value = '';
+                        itemName.value = '';
+                        
+                        // Recarregar lista de itens
+                        loadItems(cellName, productCode);
+                        
+                        // Mostrar mensagem de sucesso
+                        alert('Item adicionado com sucesso!');
+                    } else {
+                        alert(`Erro: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro na requisição:', error);
+                    alert('Erro ao adicionar item. Verifique o console para mais detalhes.');
+                });
+            }
+            
+            function confirmDeleteProduct(productCode, productName) {
+                deleteItemType = 'product';
+                deleteItemData = {
+                    cell: currentCell,
+                    code: productCode
+                };
+                
+                deleteConfirmationMessage.textContent = `Tem certeza que deseja excluir o produto "${productCode} - ${productName}"?`;
+                confirmDeleteModal.show();
+            }
+            
+            function confirmDeleteItem(itemCode, itemName) {
+                deleteItemType = 'item';
+                deleteItemData = {
+                    cell: currentCell,
+                    productCode: currentProduct,
+                    itemCode: itemCode
+                };
+                
+                deleteConfirmationMessage.textContent = `Tem certeza que deseja excluir o item "${itemCode} - ${itemName}"?`;
+                confirmDeleteModal.show();
+            }
+            
+            function deleteProduct(cellName, productCode) {
+                fetch('/api/delete_product', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        cell_name: cellName,
+                        product_code: productCode
+                    }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Recarregar lista de produtos
+                        loadProducts(cellName);
+                        
+                        // Se o produto excluído era o produto atual, resetar
+                        if (currentProduct === productCode) {
+                            currentProduct = '';
+                            noProductSelectedMessage.style.display = 'block';
+                            itemManagementContainer.style.display = 'none';
+                        }
+                        
+                        // Mostrar mensagem de sucesso
+                        alert('Produto excluído com sucesso!');
+                    } else {
+                        alert(`Erro: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro na requisição:', error);
+                    alert('Erro ao excluir produto. Verifique o console para mais detalhes.');
+                });
+            }
+            
+            function deleteItem(cellName, productCode, itemCode) {
+                fetch('/api/delete_item', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        cell_name: cellName,
+                        product_code: productCode,
+                        item_code: itemCode
+                    }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Recarregar lista de itens
+                        loadItems(cellName, productCode);
+                        
+                        // Mostrar mensagem de sucesso
+                        alert('Item excluído com sucesso!');
+                    } else {
+                        alert(`Erro: ${data.message}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro na requisição:', error);
+                    alert('Erro ao excluir item. Verifique o console para mais detalhes.');
+                });
+            }
+        });
+    </script>
+</body>
+</html>

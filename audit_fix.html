@@ -1,0 +1,1174 @@
+{% extends "index.html" %}
+{% block title %}Gestão de Processos - Auditoria{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">
+        <i class="fas fa-clipboard-check me-2"></i> Auditoria de Processos
+    </h1>
+    
+    <div id="alertContainer"></div>
+    
+    {% if not session.logged_in or session.profile != 'auditor' %}
+        <div class="alert alert-danger">
+            <h5><i class="fas fa-exclamation-triangle me-2"></i> Acesso restrito</h5>
+            <p>Esta página é destinada apenas para auditores autorizados. Se você é um auditor, faça login com suas credenciais.</p>
+            <a href="/login" class="btn btn-primary">Fazer Login</a>
+        </div>
+    {% else %}
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-filter me-2"></i> Filtros de Pesquisa</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="filterForm" class="row g-3">
+                            <div class="col-md-3">
+                                <label for="filterCell" class="form-label">Célula</label>
+                                <select id="filterCell" class="form-select">
+                                    <option value="">Todas as Células</option>
+                                    {% for cell in cells %}
+                                        <option value="{{ cell }}">{{ cell }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filterSetupType" class="form-label">Tipo de Operação</label>
+                                <select id="filterSetupType" class="form-select">
+                                    <option value="">Todos os Tipos</option>
+                                    <option value="removal">Retirada</option>
+                                    <option value="supply">Abastecimento</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filterAuditStatus" class="form-label">Status de Auditoria</label>
+                                <select id="filterAuditStatus" class="form-select">
+                                    <option value="">Todos os Status</option>
+                                    <option value="audited">Auditado</option>
+                                    <option value="pending">Pendente</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label for="filterDate" class="form-label">Data</label>
+                                <input type="date" id="filterDate" class="form-control">
+                            </div>
+                            <div class="col-md-12 mt-3">
+                                <button type="button" id="applyFilters" class="btn btn-primary me-2">
+                                    <i class="fas fa-search me-1"></i> Aplicar Filtros
+                                </button>
+                                <button type="button" id="resetFilters" class="btn btn-outline-secondary">
+                                    <i class="fas fa-undo me-1"></i> Limpar Filtros
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0"><i class="fas fa-clipboard-list me-2"></i> Registros de Setup</h5>
+                            <span class="badge bg-light text-dark" id="recordCount">
+                                {{ stats.total_records }} registros
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Célula</th>
+                                        <th>Ordem</th>
+                                        <th>Operação</th>
+                                        <th>Data/Hora</th>
+                                        <th>Abastecedor</th>
+                                        <th>Status</th>
+                                        <th class="text-end">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="setupRecords">
+                                    {% for cell_name, setups in cells_data.items() %}
+                                        {% for setup in setups %}
+                                            <tr class="setup-row {% if setup.audited %}bg-light{% endif %}"
+                                                data-cell="{{ cell_name }}"
+                                                data-setup-type="{{ setup.setup_type }}"
+                                                data-audited="{{ 'yes' if setup.audited else 'no' }}">
+                                                <td>{{ cell_name }}</td>
+                                                <td>{{ setup.order_number }}</td>
+                                                <td>
+                                                    {% if setup.setup_type == 'removal' %}
+                                                        <span class="badge bg-danger">Retirada</span>
+                                                    {% else %}
+                                                        <span class="badge bg-success">Abastecimento</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ setup.timestamp }}</td>
+                                                <td>{{ setup.supplier_name }}</td>
+                                                <td>
+                                                    {% if setup.audited %}
+                                                        <span class="badge bg-success">Auditado</span>
+                                                    {% else %}
+                                                        <span class="badge bg-warning text-dark">Pendente</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-end">
+                                                    <div class="btn-group">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary view-setup-btn"
+                                                                data-bs-toggle="modal" data-bs-target="#setupDetailsModal"
+                                                                data-cell-name="{{ cell_name }}"
+                                                                data-order-number="{{ setup.order_number }}"
+                                                                data-supplier-name="{{ setup.supplier_name }}"
+                                                                data-timestamp="{{ setup.timestamp }}"
+                                                                data-observation="{{ setup.observation }}"
+                                                                data-verification="{{ setup.verification_check }}"
+                                                                data-setup-type="{{ setup.setup_type }}"
+                                                                data-audited="{{ 'yes' if setup.audited else 'no' }}"
+                                                                data-auditor="{{ setup.auditor_name or '' }}"
+                                                                data-audit-date="{{ setup.audit_timestamp or '' }}"
+                                                                data-audit-notes="{{ setup.audit_notes or '' }}"
+                                                                data-product-code="{{ setup.product_code or '' }}"
+                                                                data-product-name="{{ setup.product_name or '' }}"
+                                                                data-product-po="{{ setup.product_po or '' }}"
+                                                                data-selected-items="{{ setup.selected_items or '' }}"
+                                                                {% if setup.main_image %}
+                                                                data-main-image="/photos/{{ cell_name }}/{{ setup.main_image }}"
+                                                                {% endif %}
+                                                                data-has-image="{{ 'yes' if setup.has_image else 'no' }}"
+                                                                data-images="{{ setup.images|tojson }}">
+                                                            <i class="fas fa-eye me-1"></i> Ver
+                                                        </button>
+                                                        
+                                                        <button type="button" class="btn btn-sm btn-outline-primary audit-setup-btn"
+                                                                data-bs-toggle="modal" data-bs-target="#auditModal"
+                                                                data-cell-name="{{ cell_name }}"
+                                                                data-order-number="{{ setup.order_number }}"
+                                                                data-supplier-name="{{ setup.supplier_name }}"
+                                                                data-observation="{{ setup.observation }}"
+                                                                data-verification="{{ setup.verification_check }}"
+                                                                data-setup-type="{{ setup.setup_type }}"
+                                                                data-action="{{ 'unmark' if setup.audited else 'mark' }}"
+                                                                data-audited="{{ 'yes' if setup.audited else 'no' }}">
+                                                            {% if setup.audited %}
+                                                                <i class="fas fa-times-circle me-1"></i> Desmarcar
+                                                            {% else %}
+                                                                <i class="fas fa-check-circle me-1"></i> Auditar
+                                                            {% endif %}
+                                                        </button>
+                                                        
+                                                        <button type="button" class="btn btn-sm btn-outline-danger delete-setup-btn"
+                                                                data-cell-name="{{ cell_name }}"
+                                                                data-order-number="{{ setup.order_number }}"
+                                                                data-setup-type="{{ setup.setup_type }}">
+                                                            <i class="fas fa-trash-alt me-1"></i> Excluir
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="7" class="text-center py-4">
+                                                <div class="empty-state">
+                                                    <i class="fas fa-clipboard-list fa-3x text-muted mb-3"></i>
+                                                    <h5>Nenhum registro encontrado</h5>
+                                                    <p class="text-muted">Não existem registros de setup para auditoria no momento.</p>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>Legenda:</strong>
+                                <span class="badge bg-danger me-2">Retirada</span>
+                                <span class="badge bg-success me-2">Abastecimento</span>
+                                <span class="badge bg-warning text-dark me-2">Pendente</span>
+                                <span class="badge bg-success">Auditado</span>
+                            </div>
+                            <div>
+                                <button type="button" id="exportDataBtn" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fas fa-file-export me-1"></i> Exportar Dados
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Estatísticas de Auditoria -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card text-white bg-primary h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Total de Registros</h5>
+                                <p class="card-text display-4">{{ stats.total_records }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-white bg-success h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Auditados</h5>
+                                <p class="card-text display-4">{{ stats.audited_records }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-dark bg-warning h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Pendentes</h5>
+                                <p class="card-text display-4">{{ stats.pending_records }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-white bg-info h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Taxa de Auditoria</h5>
+                                <p class="card-text display-4">{{ stats.audit_rate }}%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Ferramentas do Auditor -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-tools me-2"></i> Ferramentas do Auditor</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm h-100">
+                                    <div class="card-body">
+                                        <h5 class="card-title"><i class="fas fa-sync-alt me-2"></i> Reset de Fluxo</h5>
+                                        <p class="card-text text-muted">
+                                            Reinicia o fluxo de uma célula, permitindo novo ciclo de retirada/abastecimento.
+                                        </p>
+                                        <form id="resetFlowForm" class="mt-3">
+                                            <div class="mb-3">
+                                                <label for="resetCellName" class="form-label">Célula</label>
+                                                <select id="resetCellName" class="form-select" required>
+                                                    <option value="">Selecione a célula</option>
+                                                    {% for cell in cells %}
+                                                        <option value="{{ cell }}">{{ cell }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="resetReason" class="form-label">Motivo</label>
+                                                <textarea id="resetReason" class="form-control" rows="2" required></textarea>
+                                            </div>
+                                            <button type="button" id="resetFlowBtn" class="btn btn-warning">
+                                                <i class="fas fa-sync-alt me-1"></i> Resetar Fluxo
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-0 shadow-sm h-100">
+                                    <div class="card-body">
+                                        <h5 class="card-title"><i class="fas fa-chart-bar me-2"></i> Relatórios</h5>
+                                        <p class="card-text text-muted">
+                                            Relatórios e métricas de auditoria para acompanhamento de desempenho.
+                                        </p>
+                                        <div class="mt-3">
+                                            <button type="button" id="dailyReportBtn" class="btn btn-outline-primary me-2 mb-2">
+                                                <i class="fas fa-calendar-day me-1"></i> Relatório Diário
+                                            </button>
+                                            <button type="button" id="weeklyReportBtn" class="btn btn-outline-primary me-2 mb-2">
+                                                <i class="fas fa-calendar-week me-1"></i> Relatório Semanal
+                                            </button>
+                                            <button type="button" id="monthlyReportBtn" class="btn btn-outline-primary mb-2">
+                                                <i class="fas fa-calendar-alt me-1"></i> Relatório Mensal
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal de Detalhes do Setup -->
+        <div class="modal fade" id="setupDetailsModal" tabindex="-1" aria-labelledby="setupDetailsModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="setupDetailsModalLabel">Detalhes do Setup</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i> Informações Gerais</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <table class="table table-sm">
+                                            <tbody>
+                                                <tr>
+                                                    <th width="35%">Célula:</th>
+                                                    <td id="modalCellName"></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Ordem de Produção:</th>
+                                                    <td id="modalOrderNumber"></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Tipo de Operação:</th>
+                                                    <td id="modalSetupType"></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Data/Hora:</th>
+                                                    <td id="modalTimestamp"></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Abastecedor:</th>
+                                                    <td id="modalSupplierName"></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Verificação Realizada:</th>
+                                                    <td id="modalVerification"></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Observações:</th>
+                                                    <td id="modalObservation"></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="card h-100">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0"><i class="fas fa-clipboard-check me-2"></i> Status de Auditoria</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="alert" id="modalAuditStatusAlert">
+                                            <span id="modalAuditStatusIcon"></span>
+                                            <span id="modalAuditStatusText"></span>
+                                        </div>
+                                        
+                                        <table class="table table-sm">
+                                            <tbody id="auditInfoTable">
+                                                <tr>
+                                                    <th width="35%">Auditado por:</th>
+                                                    <td id="modalAuditor"></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Data da Auditoria:</th>
+                                                    <td id="modalAuditDate"></td>
+                                                </tr>
+                                                <tr>
+                                                    <th>Notas da Auditoria:</th>
+                                                    <td id="modalAuditNotes"></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Bloco de Produto e Itens - visível apenas para abastecimento -->
+                        <div class="row mt-3" id="productDetails">
+                            <div class="col-md-12">
+                                <div class="card">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0"><i class="fas fa-box me-2"></i> Detalhes do Produto</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row mb-3">
+                                            <div class="col-md-4">
+                                                <label class="fw-bold">Código do Produto:</label>
+                                                <div id="modalProductCode"></div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="fw-bold">Nome do Produto:</label>
+                                                <div id="modalProductName"></div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="fw-bold">PO do Fornecedor:</label>
+                                                <div id="modalProductPO"></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <h6 class="mb-3 mt-4">Itens do Produto</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Código</th>
+                                                        <th>Nome</th>
+                                                        <th>PO do Fornecedor</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="modalItemsTable">
+                                                    <!-- Itens serão adicionados via JavaScript -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Imagens do Setup -->
+                        <div class="row mt-3" id="imageSection">
+                            <div class="col-md-12">
+                                <div class="card">
+                                    <div class="card-header bg-light">
+                                        <h6 class="mb-0"><i class="fas fa-images me-2"></i> Evidências Fotográficas</h6>
+                                    </div>
+                                    <div class="card-body text-center" id="modalImageContainer">
+                                        <p class="text-muted" id="noImageMessage">Nenhuma imagem disponível para este registro.</p>
+                                        <div id="setupImagesCarousel" class="carousel slide" data-bs-ride="carousel">
+                                            <div class="carousel-inner" id="carouselInner">
+                                                <!-- Imagens serão adicionadas via JavaScript -->
+                                            </div>
+                                            <button class="carousel-control-prev" type="button" data-bs-target="#setupImagesCarousel" data-bs-slide="prev">
+                                                <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                                <span class="visually-hidden">Anterior</span>
+                                            </button>
+                                            <button class="carousel-control-next" type="button" data-bs-target="#setupImagesCarousel" data-bs-slide="next">
+                                                <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                                <span class="visually-hidden">Próximo</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                        <button type="button" class="btn btn-primary" id="modalAuditBtn">
+                            <i class="fas fa-check-circle me-1"></i> Auditar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal de Auditoria -->
+        <div class="modal fade" id="auditModal" tabindex="-1" aria-labelledby="auditModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="auditModalLabel">Auditar Setup</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="auditForm">
+                            <div class="mb-3">
+                                <label for="auditNotes" class="form-label">Notas da Auditoria</label>
+                                <textarea id="auditNotes" class="form-control" rows="3" placeholder="Observações sobre a auditoria (opcional)"></textarea>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="confirmAudit" required>
+                                <label class="form-check-label" for="confirmAudit">
+                                    Confirmo que verifiquei todas as informações deste setup e estão corretas.
+                                </label>
+                            </div>
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <span id="auditConfirmMessage">Ao marcar como auditado, você está confirmando que o setup foi verificado e está em conformidade.</span>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" id="submitAuditBtn">
+                            <i class="fas fa-check me-1"></i> <span id="auditButtonText">Confirmar Auditoria</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal de Confirmação de Exclusão -->
+        <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="deleteConfirmModalLabel">Confirmar Exclusão</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Você está prestes a excluir um registro de setup. Esta ação não pode ser desfeita.
+                        </div>
+                        <p>Tem certeza que deseja continuar?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                            <i class="fas fa-trash-alt me-1"></i> Excluir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Aplicar filtros na tabela
+        const setupRows = document.querySelectorAll('.setup-row');
+        const filterCell = document.getElementById('filterCell');
+        const filterSetupType = document.getElementById('filterSetupType');
+        const filterAuditStatus = document.getElementById('filterAuditStatus');
+        const filterDate = document.getElementById('filterDate');
+        const applyFilters = document.getElementById('applyFilters');
+        const resetFilters = document.getElementById('resetFilters');
+        const recordCount = document.getElementById('recordCount');
+        
+        if (applyFilters) {
+            applyFilters.addEventListener('click', function() {
+                applyTableFilters();
+            });
+        }
+        
+        if (resetFilters) {
+            resetFilters.addEventListener('click', function() {
+                filterCell.value = '';
+                filterSetupType.value = '';
+                filterAuditStatus.value = '';
+                filterDate.value = '';
+                applyTableFilters();
+            });
+        }
+        
+        function applyTableFilters() {
+            let visibleCount = 0;
+            const cellValue = filterCell.value;
+            const setupTypeValue = filterSetupType.value;
+            const auditStatusValue = filterAuditStatus.value;
+            const dateValue = filterDate.value ? new Date(filterDate.value) : null;
+            
+            setupRows.forEach(row => {
+                const cell = row.getAttribute('data-cell');
+                const setupType = row.getAttribute('data-setup-type');
+                const audited = row.getAttribute('data-audited');
+                const timestamp = row.querySelector('td:nth-child(4)').textContent;
+                
+                // Converter data do timestamp para comparação
+                let setupDate = null;
+                if (dateValue) {
+                    const dateParts = timestamp.split(' ')[0].split('/');
+                    if (dateParts.length === 3) {
+                        // Convertendo de dd/mm/yyyy para Date object
+                        setupDate = new Date(dateParts[2], dateParts[1] - 1, dateParts[0]);
+                    }
+                }
+                
+                const cellMatch = !cellValue || cell === cellValue;
+                const typeMatch = !setupTypeValue || setupType === setupTypeValue;
+                const auditMatch = !auditStatusValue || 
+                                  (auditStatusValue === 'audited' && audited === 'yes') || 
+                                  (auditStatusValue === 'pending' && audited === 'no');
+                const dateMatch = !dateValue || 
+                                 (setupDate && 
+                                  setupDate.getFullYear() === dateValue.getFullYear() && 
+                                  setupDate.getMonth() === dateValue.getMonth() && 
+                                  setupDate.getDate() === dateValue.getDate());
+                
+                if (cellMatch && typeMatch && auditMatch && (dateMatch || !dateValue)) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+            
+            // Atualizar contador de registros
+            recordCount.textContent = `${visibleCount} registro${visibleCount !== 1 ? 's' : ''} encontrado${visibleCount !== 1 ? 's' : ''}`;
+        }
+        
+        // Gerenciar modal de detalhes
+        const viewSetupBtns = document.querySelectorAll('.view-setup-btn');
+        if (viewSetupBtns) {
+            viewSetupBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // Limpar estado anterior
+                    document.getElementById('modalItemsTable').innerHTML = '';
+                    document.getElementById('carouselInner').innerHTML = '';
+                    
+                    // Preencher informações básicas
+                    document.getElementById('modalCellName').textContent = this.getAttribute('data-cell-name');
+                    document.getElementById('modalOrderNumber').textContent = this.getAttribute('data-order-number');
+                    
+                    const setupType = this.getAttribute('data-setup-type');
+                    document.getElementById('modalSetupType').innerHTML = setupType === 'removal' ? 
+                        '<span class="badge bg-danger">Retirada</span>' : 
+                        '<span class="badge bg-success">Abastecimento</span>';
+                    
+                    document.getElementById('modalTimestamp').textContent = this.getAttribute('data-timestamp');
+                    document.getElementById('modalSupplierName').textContent = this.getAttribute('data-supplier-name');
+                    document.getElementById('modalVerification').innerHTML = this.getAttribute('data-verification') === 'True' ? 
+                        '<span class="badge bg-success">Sim</span>' : 
+                        '<span class="badge bg-danger">Não</span>';
+                    
+                    const observation = this.getAttribute('data-observation');
+                    document.getElementById('modalObservation').textContent = observation || 'Nenhuma observação';
+                    
+                    // Status de auditoria
+                    const isAudited = this.getAttribute('data-audited') === 'yes';
+                    const auditStatusAlert = document.getElementById('modalAuditStatusAlert');
+                    const auditStatusText = document.getElementById('modalAuditStatusText');
+                    const auditStatusIcon = document.getElementById('modalAuditStatusIcon');
+                    const auditInfoTable = document.getElementById('auditInfoTable');
+                    const modalAuditBtn = document.getElementById('modalAuditBtn');
+                    
+                    if (isAudited) {
+                        auditStatusAlert.className = 'alert alert-success';
+                        auditStatusIcon.innerHTML = '<i class="fas fa-check-circle me-2"></i>';
+                        auditStatusText.textContent = 'Este registro foi auditado e está em conformidade.';
+                        auditInfoTable.style.display = 'table';
+                        
+                        document.getElementById('modalAuditor').textContent = this.getAttribute('data-auditor') || '-';
+                        document.getElementById('modalAuditDate').textContent = this.getAttribute('data-audit-date') || '-';
+                        document.getElementById('modalAuditNotes').textContent = this.getAttribute('data-audit-notes') || 'Sem notas adicionais';
+                        
+                        modalAuditBtn.innerHTML = '<i class="fas fa-times-circle me-1"></i> Remover Auditoria';
+                        modalAuditBtn.className = 'btn btn-warning';
+                    } else {
+                        auditStatusAlert.className = 'alert alert-warning';
+                        auditStatusIcon.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>';
+                        auditStatusText.textContent = 'Este registro ainda não foi auditado.';
+                        auditInfoTable.style.display = 'none';
+                        
+                        modalAuditBtn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Auditar';
+                        modalAuditBtn.className = 'btn btn-primary';
+                    }
+                    
+                    // Configurar botão de auditoria
+                    modalAuditBtn.setAttribute('data-cell-name', this.getAttribute('data-cell-name'));
+                    modalAuditBtn.setAttribute('data-order-number', this.getAttribute('data-order-number'));
+                    modalAuditBtn.setAttribute('data-supplier-name', this.getAttribute('data-supplier-name'));
+                    modalAuditBtn.setAttribute('data-observation', observation || '');
+                    modalAuditBtn.setAttribute('data-verification', this.getAttribute('data-verification'));
+                    modalAuditBtn.setAttribute('data-setup-type', setupType);
+                    modalAuditBtn.setAttribute('data-action', isAudited ? 'unmark' : 'mark');
+                    
+                    // Mostrar detalhes do produto apenas para abastecimento
+                    const productDetails = document.getElementById('productDetails');
+                    if (setupType === 'supply') {
+                        productDetails.style.display = 'block';
+                        
+                        document.getElementById('modalProductCode').textContent = this.getAttribute('data-product-code') || '-';
+                        document.getElementById('modalProductName').textContent = this.getAttribute('data-product-name') || '-';
+                        document.getElementById('modalProductPO').textContent = this.getAttribute('data-product-po') || '-';
+                        
+                        // Preencher tabela de itens
+                        const selectedItems = this.getAttribute('data-selected-items');
+                        const itemsTable = document.getElementById('modalItemsTable');
+                        
+                        if (selectedItems && selectedItems !== '') {
+                            try {
+                                const items = JSON.parse(selectedItems);
+                                if (items && items.length > 0) {
+                                    items.forEach(item => {
+                                        const row = document.createElement('tr');
+                                        row.innerHTML = `
+                                            <td>${item.code || '-'}</td>
+                                            <td>${item.name || '-'}</td>
+                                            <td>${item.supplierPO || '-'}</td>
+                                        `;
+                                        itemsTable.appendChild(row);
+                                    });
+                                } else {
+                                    itemsTable.innerHTML = `
+                                        <tr>
+                                            <td colspan="3" class="text-center">Nenhum item registrado</td>
+                                        </tr>
+                                    `;
+                                }
+                            } catch (e) {
+                                console.error('Erro ao processar itens:', e);
+                                itemsTable.innerHTML = `
+                                    <tr>
+                                        <td colspan="3" class="text-center">Erro ao carregar itens</td>
+                                    </tr>
+                                `;
+                            }
+                        } else {
+                            itemsTable.innerHTML = `
+                                <tr>
+                                    <td colspan="3" class="text-center">Nenhum item registrado</td>
+                                </tr>
+                            `;
+                        }
+                    } else {
+                        productDetails.style.display = 'none';
+                    }
+                    
+                    // Imagens
+                    const mainImage = this.getAttribute('data-main-image');
+                    const hasImage = this.getAttribute('data-has-image') === 'yes';
+                    const noImageMessage = document.getElementById('noImageMessage');
+                    const setupImagesCarousel = document.getElementById('setupImagesCarousel');
+                    const carouselInner = document.getElementById('carouselInner');
+                    
+                    if (hasImage && mainImage) {
+                        noImageMessage.style.display = 'none';
+                        setupImagesCarousel.style.display = 'block';
+                        
+                        // Adicionar imagem principal
+                        const mainImageDiv = document.createElement('div');
+                        mainImageDiv.className = 'carousel-item active';
+                        mainImageDiv.innerHTML = `
+                            <img src="${mainImage}" class="d-block w-100" alt="Imagem do setup">
+                        `;
+                        carouselInner.appendChild(mainImageDiv);
+                        
+                        // Adicionar imagens adicionais se houver
+                        try {
+                            const images = JSON.parse(this.getAttribute('data-images') || '[]');
+                            if (images && images.length > 1) {
+                                // Começar do segundo item, já que o primeiro é a imagem principal
+                                for (let i = 1; i < images.length; i++) {
+                                    const imgPath = images[i].path;
+                                    if (imgPath) {
+                                        const imageDiv = document.createElement('div');
+                                        imageDiv.className = 'carousel-item';
+                                        imageDiv.innerHTML = `
+                                            <img src="/photos/${this.getAttribute('data-cell-name')}/${imgPath}" class="d-block w-100" alt="Imagem do setup ${i+1}">
+                                        `;
+                                        carouselInner.appendChild(imageDiv);
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Erro ao processar imagens adicionais:', e);
+                        }
+                    } else {
+                        noImageMessage.style.display = 'block';
+                        setupImagesCarousel.style.display = 'none';
+                    }
+                });
+            });
+        }
+        
+        // Gerenciar botão de auditoria no modal de detalhes
+        const modalAuditBtn = document.getElementById('modalAuditBtn');
+        if (modalAuditBtn) {
+            modalAuditBtn.addEventListener('click', function() {
+                const auditModal = new bootstrap.Modal(document.getElementById('auditModal'));
+                const setupDetailsModal = bootstrap.Modal.getInstance(document.getElementById('setupDetailsModal'));
+                
+                // Transferir dados para o modal de auditoria
+                const cellName = this.getAttribute('data-cell-name');
+                const orderNumber = this.getAttribute('data-order-number');
+                const supplierName = this.getAttribute('data-supplier-name');
+                const observation = this.getAttribute('data-observation');
+                const verificationCheck = this.getAttribute('data-verification');
+                const setupType = this.getAttribute('data-setup-type');
+                const action = this.getAttribute('data-action');
+                
+                // Configurar elementos no modal de auditoria
+                const auditButtonText = document.getElementById('auditButtonText');
+                const auditConfirmMessage = document.getElementById('auditConfirmMessage');
+                const submitAuditBtn = document.getElementById('submitAuditBtn');
+                const confirmAudit = document.getElementById('confirmAudit');
+                
+                if (action === 'mark') {
+                    auditButtonText.textContent = 'Confirmar Auditoria';
+                    auditConfirmMessage.textContent = 'Ao marcar como auditado, você está confirmando que o setup foi verificado e está em conformidade.';
+                    submitAuditBtn.className = 'btn btn-primary';
+                } else {
+                    auditButtonText.textContent = 'Remover Auditoria';
+                    auditConfirmMessage.textContent = 'Ao remover a auditoria, este registro voltará ao status de pendente.';
+                    submitAuditBtn.className = 'btn btn-warning';
+                }
+                
+                // Configurar o botão de submit da auditoria
+                submitAuditBtn.onclick = function() {
+                    if (action === 'mark' && !confirmAudit.checked) {
+                        alert('Por favor, confirme que verificou as informações.');
+                        return;
+                    }
+                    
+                    const auditNotes = document.getElementById('auditNotes').value;
+                    
+                    // Ocultar modal atual
+                    auditModal.hide();
+                    
+                    // Chamar função para marcar como auditado
+                    markSetupAsAudited(
+                        cellName, 
+                        orderNumber, 
+                        supplierName, 
+                        observation, 
+                        verificationCheck, 
+                        setupType,
+                        action,
+                        auditNotes
+                    );
+                    
+                    // Fechar o modal de detalhes também
+                    if (setupDetailsModal) {
+                        setupDetailsModal.hide();
+                    }
+                };
+                
+                // Fechar modal de detalhes e abrir modal de auditoria
+                if (setupDetailsModal) {
+                    setupDetailsModal.hide();
+                }
+                
+                auditModal.show();
+            });
+        }
+        
+        // Botão de reset de fluxo
+        const resetFlowBtn = document.getElementById('resetFlowBtn');
+        if (resetFlowBtn) {
+            resetFlowBtn.addEventListener('click', function() {
+                const cellName = document.getElementById('resetCellName').value;
+                const resetReason = document.getElementById('resetReason').value;
+                
+                if (!cellName) {
+                    alert('Por favor, selecione uma célula');
+                    return;
+                }
+                
+                if (!resetReason) {
+                    alert('Por favor, informe o motivo do reset');
+                    return;
+                }
+                
+                // Confirmar antes de resetar
+                if (confirm(`Tem certeza que deseja resetar o fluxo da célula ${cellName}?`)) {
+                    resetCellFlow(cellName, resetReason);
+                }
+            });
+        }
+        
+        // Função para resetar fluxo de célula
+        function resetCellFlow(cellName, resetReason) {
+            // Mostrar mensagem de processamento
+            const alertContainer = document.getElementById('alertContainer');
+            alertContainer.innerHTML = `
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Resetando fluxo da célula, aguarde...
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            
+            // Preparar dados para a API
+            const data = {
+                cell_name: cellName,
+                reset_reason: resetReason
+            };
+            
+            // Enviar requisição para API
+            fetch('/api/reset_cell', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mostrar mensagem de sucesso
+                    alertContainer.innerHTML = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <i class="fas fa-check-circle me-2"></i>
+                            ${data.message || 'Fluxo da célula resetado com sucesso!'}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    
+                    // Limpar campos
+                    document.getElementById('resetCellName').value = '';
+                    document.getElementById('resetReason').value = '';
+                } else {
+                    throw new Error(data.message || 'Erro ao resetar o fluxo da célula');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                
+                // Mostrar mensagem de erro
+                alertContainer.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${error.message || 'Erro ao resetar o fluxo da célula'}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+            });
+        }
+        
+        // Adicionar evento para botões de auditoria
+        const auditSetupBtns = document.querySelectorAll('.audit-setup-btn');
+        if (auditSetupBtns) {
+            auditSetupBtns.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const cellName = this.getAttribute('data-cell-name');
+                    const orderNumber = this.getAttribute('data-order-number');
+                    const supplierName = this.getAttribute('data-supplier-name');
+                    const observation = this.getAttribute('data-observation') || '';
+                    const verificationCheck = this.getAttribute('data-verification');
+                    const setupType = this.getAttribute('data-setup-type');
+                    const action = this.getAttribute('data-action') || 'mark';
+                    
+                    // Atualizar o atributo data-action para a função markSetupAsAudited
+                    this.setAttribute('data-action', action);
+                    
+                    markSetupAsAudited(cellName, orderNumber, supplierName, observation, verificationCheck, setupType, action);
+                });
+            });
+            
+            // Adicionar evento para excluir setup
+            const deleteSetupBtns = document.querySelectorAll('.delete-setup-btn');
+            deleteSetupBtns.forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const cellName = this.getAttribute('data-cell-name');
+                    const orderNumber = this.getAttribute('data-order-number');
+                    const setupType = this.getAttribute('data-setup-type');
+                    
+                    // Configurar modal de confirmação
+                    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+                    confirmDeleteBtn.onclick = function() {
+                        deleteSetup(cellName, orderNumber, setupType);
+                    };
+                    
+                    // Abrir modal de confirmação
+                    const deleteConfirmModal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+                    deleteConfirmModal.show();
+                });
+            });
+        });
+        
+        // Função para atualizar setup
+        function updateSetup(cellName, orderNumber, supplierName, observation, verificationCheck, setupType) {
+            // Preparar dados para a API
+            const data = {
+                cell_name: cellName,
+                order_number: orderNumber,
+                supplier_name: supplierName,
+                observation: observation,
+                verification_check: verificationCheck,
+                setup_type: setupType
+            };
+            
+            // Enviar requisição para API
+            fetch('/api/update_setup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Setup atualizado com sucesso!');
+                    window.location.reload();
+                } else {
+                    alert('Erro ao atualizar setup: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Erro ao atualizar setup');
+            });
+        }
+        
+        // Função para marcar setup como auditado
+        function markSetupAsAudited(cellName, orderNumber, supplierName, observation, verificationCheck, setupType, action='mark', auditNotes='') {
+            // Encontrar o botão clicado para mostrar progresso
+            const btn = document.querySelector(`.audit-setup-btn[data-cell-name="${cellName}"][data-order-number="${orderNumber}"][data-setup-type="${setupType}"]`);
+            
+            let originalBtnHTML = '';
+            if (btn) {
+                originalBtnHTML = btn.innerHTML;
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...`;
+                btn.disabled = true;
+            }
+            
+            // Preparar dados para a API
+            const data = {
+                cell_name: cellName,
+                order_number: orderNumber,
+                supplier_name: supplierName,
+                observation: observation,
+                verification_check: verificationCheck === 'True',
+                setup_type: setupType,
+                is_mark: action === 'mark',
+                audit_notes: auditNotes
+            };
+            
+            // Mostrar mensagem de processamento
+            const alertContainer = document.getElementById('alertContainer');
+            if (alertContainer) {
+                alertContainer.innerHTML = `
+                    <div class="alert alert-info alert-dismissible fade show" role="alert">
+                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                        ${action === 'mark' ? 'Marcando como auditado' : 'Removendo auditoria'}, aguarde...
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+            }
+            
+            submitAuditRequest(data, btn, originalBtnHTML);
+        }
+        
+        // Função para excluir setup
+        function deleteSetup(cellName, orderNumber, setupType) {
+            // Preparar dados para a API
+            const data = {
+                cell_name: cellName,
+                order_number: orderNumber,
+                setup_type: setupType
+            };
+            
+            // Fechar o modal de confirmação
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Mostrar mensagem de processamento
+            const alertContainer = document.getElementById('alertContainer');
+            alertContainer.innerHTML = `
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Excluindo registro, aguarde...
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            
+            // Enviar requisição para API
+            fetch('/api/delete_setup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mostrar mensagem de sucesso
+                    alertContainer.innerHTML = `
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            Registro excluído com sucesso!
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                    
+                    // Recarregar a página após um pequeno delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    throw new Error(data.message || 'Erro ao excluir o registro');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                
+                // Mostrar mensagem de erro
+                alertContainer.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        ${error.message || 'Erro ao excluir o registro'}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+            });
+        }
+        
+        // Função para enviar a requisição de auditoria
+        function submitAuditRequest(data, btn, originalBtnHTML) {
+            // Enviar requisição para API
+            fetch('/api/mark_as_audited', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(responseData => {
+                // Restaurar botão
+                if (btn) {
+                    btn.innerHTML = originalBtnHTML;
+                    btn.disabled = false;
+                }
+                
+                // Mostrar mensagem adequada
+                const alertContainer = document.getElementById('alertContainer');
+                if (alertContainer) {
+                    if (responseData.success) {
+                        alertContainer.innerHTML = `
+                            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                <i class="fas fa-check-circle me-2"></i>
+                                ${responseData.message || (data.audited ? 'Registro marcado como auditado com sucesso!' : 'Auditoria removida com sucesso!')}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        `;
+                        
+                        // Recarregar a página após um pequeno delay
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        alertContainer.innerHTML = `
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                ${responseData.message || 'Erro ao processar a auditoria'}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        `;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                
+                // Restaurar botão
+                if (btn) {
+                    btn.innerHTML = originalBtnHTML;
+                    btn.disabled = false;
+                }
+                
+                // Mostrar mensagem de erro
+                const alertContainer = document.getElementById('alertContainer');
+                if (alertContainer) {
+                    alertContainer.innerHTML = `
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Erro ao processar a requisição: ${error.message || 'Erro desconhecido'}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    `;
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}
