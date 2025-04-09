@@ -1223,9 +1223,13 @@ def setup():
         
         # Validação específica para abastecimento
         if setup_type == 'supply':
-            if product_code and product_name:
-                # Adicionar validação extra para produtos e itens
-                pass  # Opcional: validação adicional
+            # Para abastecimento, produto é obrigatório
+            if not product_code or not product_name:
+                flash('Por favor, selecione um produto para o abastecimento.', 'danger')
+                return redirect(url_for('setup', qrcode=cell_name))
+                
+            # Adicionar campos de produto aos campos obrigatórios
+            required_fields.extend([product_code, product_name])
         
         # Para todos os tipos, verificar o nome do abastecedor
         if not supplier_name:

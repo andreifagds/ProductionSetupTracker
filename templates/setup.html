@@ -218,12 +218,15 @@
     <label for="productSelection" class="form-label">Produto</label>
     <div class="row">
         <div class="col-md-4 mb-2 mb-md-0">
-            <input type="text" class="form-control" id="productCode" name="product_code" placeholder="Código">
-            <input type="hidden" id="productName" name="product_name">
+            <input type="text" class="form-control" id="productCode" name="product_code" placeholder="Código" required>
+            <div class="invalid-feedback">
+                Por favor, informe o código do produto.
+            </div>
+            <input type="hidden" id="productName" name="product_name" required>
             <input type="hidden" id="selectedItems" name="selected_items">
         </div>
         <div class="col-md-8">
-            <select class="form-select" id="productSelection">
+            <select class="form-select" id="productSelection" required>
                 <option value="" selected>Selecione um produto</option>
                 {% for product in cell_products %}
                 <option value="{{ product.code }}" data-name="{{ product.name }}">
@@ -231,6 +234,9 @@
                 </option>
                 {% endfor %}
             </select>
+            <div class="invalid-feedback">
+                Por favor, selecione um produto para esta célula.
+            </div>
         </div>
     </div>
     <div class="form-text" id="productHelp">Selecione ou digite o código do produto para esta célula.</div>
