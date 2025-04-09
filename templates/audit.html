@@ -347,11 +347,7 @@
                                                                                 data-supplier-name="{{ setup.supplier_name }}"
                                                                                 data-observation="{{ setup.observation }}"
                                                                                 data-verification-check="{{ setup.verification_check }}"
-                                                                                data-setup-type="{{ setup.setup_type }}"
-                                                                                {% if setup.product_code %}data-product-code="{{ setup.product_code }}"{% endif %}
-                                                                                {% if setup.product_name %}data-product-name="{{ setup.product_name }}"{% endif %}
-                                                                                {% if setup.product_po %}data-product-po="{{ setup.product_po }}"{% endif %}
-                                                                                {% if setup.selected_items %}data-selected-items="{{ setup.selected_items|tojson|e }}"{% endif %}>
+                                                                                data-setup-type="{{ setup.setup_type }}">
                                                                             <i class="fa fa-edit me-1"></i> Editar
                                                                         </button>
                                                                         
@@ -421,16 +417,10 @@
                 </div>
                 <div class="modal-body">
                     <form id="editSetupForm">
-                        <!-- Hidden fields - Apenas ID da célula e tipo de setup são ocultos -->
+                        <!-- Hidden fields -->
                         <input type="hidden" id="editCellName" name="cell_name">
+                        <input type="hidden" id="editOrderNumber" name="order_number">
                         <input type="hidden" id="editSetupType" name="setup_type">
-                        <input type="hidden" id="editOldOrderNumber" name="old_order_number">
-                        
-                        <!-- Ordem de Produção -->
-                        <div class="mb-3">
-                            <label for="editOrderNumber" class="form-label">Número da Ordem de Produção</label>
-                            <input type="text" class="form-control" id="editOrderNumber" name="order_number" required>
-                        </div>
                         
                         <!-- Data e Hora do Registro -->
                         <div class="mb-3">
@@ -442,33 +432,6 @@
                         <div class="mb-3">
                             <label for="editSupplierName" class="form-label">Nome do Abastecedor</label>
                             <input type="text" class="form-control" id="editSupplierName" name="supplier_name" required>
-                        </div>
-                        
-                        <!-- Campos específicos para abastecimento -->
-                        <div id="editSupplyFields" style="display: none;">
-                            <!-- Seleção de Produto -->
-                            <div class="mb-3">
-                                <label for="editProductSelect" class="form-label">Produto</label>
-                                <select class="form-select" id="editProductSelect" name="product_code" required>
-                                    <option value="">Selecione um produto</option>
-                                    <!-- Opções carregadas via JavaScript -->
-                                </select>
-                                <input type="hidden" id="editProductName" name="product_name">
-                            </div>
-                            
-                            <!-- PO do Produto -->
-                            <div class="mb-3">
-                                <label for="editProductPO" class="form-label">PO do Produto</label>
-                                <input type="text" class="form-control" id="editProductPO" name="product_po" placeholder="Número da PO do produto">
-                            </div>
-                            
-                            <!-- Itens do Produto -->
-                            <div class="mb-3">
-                                <label class="form-label">Itens do Produto</label>
-                                <div id="editItemsList" class="list-group mb-3">
-                                    <!-- Lista de itens carregada via JavaScript -->
-                                </div>
-                            </div>
                         </div>
                         
                         <!-- Photo Upload -->
@@ -781,17 +744,9 @@
                     const hasImage = this.getAttribute('data-has-image') === 'True';
                     const fileIdentifier = `${orderNumber}_${setupType}`;
                     
-                    // Dados de produto (para setup tipo 'supply')
-                    const productCode = this.getAttribute('data-product-code') || '';
-                    const productName = this.getAttribute('data-product-name') || '';
-                    const productPO = this.getAttribute('data-product-po') || '';
-                    const selectedItemsStr = this.getAttribute('data-selected-items');
-                    const selectedItems = selectedItemsStr ? JSON.parse(selectedItemsStr) : [];
-                    
                     // Atualizar o modal com os dados
                     document.getElementById('editCellName').value = cellName;
                     document.getElementById('editOrderNumber').value = orderNumber;
-                    document.getElementById('editOldOrderNumber').value = orderNumber; // Guardar número original
                     document.getElementById('editSupplierName').value = supplierName || '';
                     document.getElementById('editObservation').value = observation;
                     document.getElementById('editVerificationCheck').checked = verificationCheck;
@@ -805,17 +760,6 @@
                     if (timestamp) {
                         const formattedDate = formatDateForInput(timestamp);
                         document.getElementById('editTimestamp').value = formattedDate;
-                    }
-                    
-                    // Configurar campos específicos para tipo de setup
-                    const supplyFields = document.getElementById('editSupplyFields');
-                    if (setupType === 'supply') {
-                        supplyFields.style.display = 'block';
-                        
-                        // Carregar produtos da célula
-                        loadCellProductsForEdit(cellName, productCode, productName, productPO, selectedItems);
-                    } else {
-                        supplyFields.style.display = 'none';
                     }
                     
                     // Atualizar preview das imagens se existirem
@@ -1000,192 +944,16 @@
             });
         });
         
-        // Função para carregar produtos da célula para edição
-        function loadCellProductsForEdit(cellName, selectedProductCode, selectedProductName, selectedProductPO, selectedItems) {
-            const productSelect = document.getElementById('editProductSelect');
-            const itemsList = document.getElementById('editItemsList');
-            
-            // Limpar seleção atual
-            productSelect.innerHTML = '<option value="">Selecione um produto</option>';
-            itemsList.innerHTML = '<div class="alert alert-info">Selecione um produto para ver os itens</div>';
-            
-            // Carregar produtos da célula
-            fetch(`/api/cell_products/${cellName}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.products && data.products.length > 0) {
-                        // Popular select de produtos
-                        data.products.forEach(product => {
-                            const option = document.createElement('option');
-                            option.value = product.code;
-                            option.textContent = `${product.code} - ${product.name}`;
-                            option.setAttribute('data-name', product.name);
-                            option.setAttribute('data-items', JSON.stringify(product.items || []));
-                            
-                            // Selecionar o produto atual
-                            if (product.code === selectedProductCode) {
-                                option.selected = true;
-                            }
-                            
-                            productSelect.appendChild(option);
-                        });
-                        
-                        // Se temos um produto selecionado, preencher o campo de nome
-                        if (selectedProductCode) {
-                            document.getElementById('editProductName').value = selectedProductName;
-                        }
-                        
-                        // Preencher o campo PO do produto se existe
-                        if (selectedProductPO) {
-                            document.getElementById('editProductPO').value = selectedProductPO;
-                        }
-                        
-                        // Mostrar itens do produto selecionado
-                        if (selectedProductCode) {
-                            // Encontrar o produto selecionado para obter a lista de itens
-                            const selectedProduct = data.products.find(p => p.code === selectedProductCode);
-                            if (selectedProduct && selectedProduct.items && selectedProduct.items.length > 0) {
-                                // Limpar lista de itens
-                                itemsList.innerHTML = '';
-                                
-                                // Adicionar cada item na lista
-                                selectedProduct.items.forEach(item => {
-                                    // Verificar se o item está na lista de itens selecionados
-                                    const selectedItem = selectedItems.find(si => si.code === item.code);
-                                    const itemPO = selectedItem ? selectedItem.po || '' : '';
-                                    
-                                    const itemElement = document.createElement('div');
-                                    itemElement.className = 'list-group-item';
-                                    itemElement.innerHTML = `
-                                        <div class="d-flex justify-content-between align-items-center flex-wrap">
-                                            <div class="form-check">
-                                                <input class="form-check-input item-checkbox" type="checkbox" value="${item.code}" 
-                                                    id="item_${item.code}" name="selected_items[]" checked data-name="${item.name}">
-                                                <label class="form-check-label" for="item_${item.code}">
-                                                    ${item.code} - ${item.name}
-                                                </label>
-                                            </div>
-                                            <div class="mt-2 mt-md-0 w-100 mt-2">
-                                                <label class="form-label small mb-0">PO do Item</label>
-                                                <input type="text" class="form-control form-control-sm item-po" 
-                                                    placeholder="PO do Item" value="${itemPO}" 
-                                                    data-item-code="${item.code}" data-item-name="${item.name}">
-                                            </div>
-                                        </div>
-                                    `;
-                                    itemsList.appendChild(itemElement);
-                                });
-                            } else {
-                                itemsList.innerHTML = '<div class="alert alert-warning">Este produto não possui itens cadastrados</div>';
-                            }
-                        }
-                        
-                        // Adicionar evento para quando o produto for trocado
-                        productSelect.addEventListener('change', function() {
-                            const selectedOption = this.options[this.selectedIndex];
-                            
-                            // Atualizar o campo de nome do produto
-                            if (selectedOption && selectedOption.value) {
-                                document.getElementById('editProductName').value = selectedOption.getAttribute('data-name') || '';
-                                
-                                // Carregar itens do produto selecionado
-                                const itemsData = JSON.parse(selectedOption.getAttribute('data-items') || '[]');
-                                
-                                if (itemsData.length > 0) {
-                                    // Limpar lista de itens
-                                    itemsList.innerHTML = '';
-                                    
-                                    // Adicionar cada item na lista
-                                    itemsData.forEach(item => {
-                                        const itemElement = document.createElement('div');
-                                        itemElement.className = 'list-group-item';
-                                        itemElement.innerHTML = `
-                                            <div class="d-flex justify-content-between align-items-center flex-wrap">
-                                                <div class="form-check">
-                                                    <input class="form-check-input item-checkbox" type="checkbox" value="${item.code}" 
-                                                        id="item_${item.code}" name="selected_items[]" checked data-name="${item.name}">
-                                                    <label class="form-check-label" for="item_${item.code}">
-                                                        ${item.code} - ${item.name}
-                                                    </label>
-                                                </div>
-                                                <div class="mt-2 mt-md-0 w-100 mt-2">
-                                                    <label class="form-label small mb-0">PO do Item</label>
-                                                    <input type="text" class="form-control form-control-sm item-po" 
-                                                        placeholder="PO do Item" 
-                                                        data-item-code="${item.code}" data-item-name="${item.name}">
-                                                </div>
-                                            </div>
-                                        `;
-                                        itemsList.appendChild(itemElement);
-                                    });
-                                } else {
-                                    itemsList.innerHTML = '<div class="alert alert-warning">Este produto não possui itens cadastrados</div>';
-                                }
-                            } else {
-                                // Limpar campos se nenhum produto selecionado
-                                document.getElementById('editProductName').value = '';
-                                itemsList.innerHTML = '<div class="alert alert-info">Selecione um produto para ver os itens</div>';
-                            }
-                        });
-                    } else {
-                        // Se não tiver produtos
-                        productSelect.innerHTML = '<option value="">Nenhum produto cadastrado para esta célula</option>';
-                        itemsList.innerHTML = '<div class="alert alert-warning">Nenhum produto cadastrado para esta célula</div>';
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar produtos:', error);
-                    // Mostrar mensagem de erro
-                    productSelect.innerHTML = '<option value="">Erro ao carregar produtos</option>';
-                    itemsList.innerHTML = '<div class="alert alert-danger">Erro ao carregar produtos da célula</div>';
-                });
-        }
-        
+        // Função para atualizar setup
         function updateSetup(cellName, orderNumber, supplierName, observation, verificationCheck, audited, auditor_name, setupType, photoData, timestamp) {
-            // Obter o número da ordem original para determinar o nome do arquivo a ser alterado
-            const oldOrderNumber = document.getElementById('editOldOrderNumber').value;
-            
-            // Coletar dados dos campos do produto e itens para abastecimentos
-            let productData = {};
-            if (setupType === 'supply' && document.getElementById('editSupplyFields').style.display !== 'none') {
-                const productSelect = document.getElementById('editProductSelect');
-                const productCode = productSelect.value;
-                const productName = document.getElementById('editProductName').value;
-                const productPO = document.getElementById('editProductPO').value;
-                
-                // Coletar itens selecionados e seus POs
-                const selectedItems = [];
-                const itemCheckboxes = document.querySelectorAll('.item-checkbox:checked');
-                itemCheckboxes.forEach(checkbox => {
-                    const itemCode = checkbox.value;
-                    const itemName = checkbox.getAttribute('data-name');
-                    const itemPO = document.querySelector(`.item-po[data-item-code="${itemCode}"]`).value || '';
-                    
-                    selectedItems.push({
-                        code: itemCode,
-                        name: itemName,
-                        po: itemPO
-                    });
-                });
-                
-                productData = {
-                    product_code: productCode,
-                    product_name: productName,
-                    product_po: productPO,
-                    selected_items: selectedItems
-                };
-            }
-            
             // Preparar dados para a API
             const data = {
                 cell_name: cellName,
-                old_order_number: oldOrderNumber,
                 order_number: orderNumber,
                 supplier_name: supplierName,
                 observation: observation,
                 verification_check: verificationCheck,
-                setup_type: setupType,
-                ...productData
+                setup_type: setupType
             };
             
             if (audited !== undefined) {
@@ -1277,7 +1045,6 @@
                     }
 
                     const auditNotes = document.getElementById('auditNotes').value;
-                    const auditorName = '{{ session.get("username", "") }}';
                     
                     // Preparar dados para a API com as anotações
                     const data = {

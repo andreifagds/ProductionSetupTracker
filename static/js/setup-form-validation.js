@@ -1,14 +1,10 @@
 // Script para validação do formulário de setup e habilitação do botão de envio
-// Criar objeto global para permitir acesso externo a funções específicas
-var setupFormValidation = {};
-
 document.addEventListener('DOMContentLoaded', function() {
     console.log("[SETUP-VALIDATION] Inicializando validação do formulário de setup");
     
     // Elementos do formulário
     const setupForm = document.getElementById('setupForm');
     const submitButton = document.getElementById('submitSetupBtn');
-    const finalizeButton = document.getElementById('finalizeButton'); // Botão usado no modo formulário
     const setupType = document.getElementById('setupType');
     const orderNumber = document.getElementById('orderNumber');
     const supplierName = document.getElementById('supplierName');
@@ -124,25 +120,6 @@ document.addEventListener('DOMContentLoaded', function() {
         orderNumber.addEventListener('input', function() {
             formValidationState.orderNumber = !!this.value.trim();
             validateForm();
-            
-            // Validação adicional para o botão de retirada
-            const finalizeRemovalButton = document.getElementById('finalizeRemovalButton');
-            if (finalizeRemovalButton && setupType && setupType.value === 'removal') {
-                const hasOrderNumber = !!this.value.trim();
-                const photoValid = !!photoData.value;
-                const verificationValid = verificationCheck.checked;
-                
-                // Para retirada, só precisamos de ordem, foto e verificação
-                const canFinalizeRemoval = hasOrderNumber && photoValid && verificationValid;
-                finalizeRemovalButton.disabled = !canFinalizeRemoval;
-                
-                console.log("[SETUP-VALIDATION] Validação de botão de retirada (ordem):", {
-                    hasOrderNumber,
-                    photoValid,
-                    verificationValid,
-                    canFinalizeRemoval
-                });
-            }
         });
     }
     
@@ -164,25 +141,6 @@ document.addEventListener('DOMContentLoaded', function() {
         photoInput.addEventListener('change', function() {
             formValidationState.photo = this.files.length > 0;
             validateForm();
-            
-            // Validação adicional para botão de retirada
-            const finalizeRemovalButton = document.getElementById('finalizeRemovalButton');
-            if (finalizeRemovalButton && setupType && setupType.value === 'removal') {
-                const hasOrderNumber = !!orderNumber.value.trim();
-                const photoValid = this.files.length > 0;
-                const verificationValid = verificationCheck.checked;
-                
-                // Para retirada, só precisamos de ordem, foto e verificação
-                const canFinalizeRemoval = hasOrderNumber && photoValid && verificationValid;
-                finalizeRemovalButton.disabled = !canFinalizeRemoval;
-                
-                console.log("[SETUP-VALIDATION] Validação de botão de retirada (foto):", {
-                    hasOrderNumber,
-                    photoValid,
-                    verificationValid,
-                    canFinalizeRemoval
-                });
-            }
         });
         
         // Verificar também quando os dados da foto são atualizados (via data URL)
@@ -190,25 +148,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const photoDataObserver = new MutationObserver(function() {
                 formValidationState.photo = !!photoData.value;
                 validateForm();
-                
-                // Validação adicional para botão de retirada
-                const finalizeRemovalButton = document.getElementById('finalizeRemovalButton');
-                if (finalizeRemovalButton && setupType && setupType.value === 'removal') {
-                    const hasOrderNumber = !!orderNumber.value.trim();
-                    const photoValid = !!photoData.value;
-                    const verificationValid = verificationCheck.checked;
-                    
-                    // Para retirada, só precisamos de ordem, foto e verificação
-                    const canFinalizeRemoval = hasOrderNumber && photoValid && verificationValid;
-                    finalizeRemovalButton.disabled = !canFinalizeRemoval;
-                    
-                    console.log("[SETUP-VALIDATION] Validação de botão de retirada (photoData):", {
-                        hasOrderNumber,
-                        photoValid,
-                        verificationValid,
-                        canFinalizeRemoval
-                    });
-                }
             });
             
             photoDataObserver.observe(photoData, { attributes: true });
@@ -220,25 +159,6 @@ document.addEventListener('DOMContentLoaded', function() {
         verificationCheck.addEventListener('change', function() {
             formValidationState.verification = this.checked;
             validateForm();
-            
-            // Validação adicional para o botão de retirada
-            const finalizeRemovalButton = document.getElementById('finalizeRemovalButton');
-            if (finalizeRemovalButton && setupType && setupType.value === 'removal') {
-                const hasOrderNumber = !!orderNumber.value;
-                const photoValid = !!photoData.value;
-                const verificationValid = this.checked;
-                
-                // Para retirada, só precisamos de ordem, foto e verificação
-                const canFinalizeRemoval = hasOrderNumber && photoValid && verificationValid;
-                finalizeRemovalButton.disabled = !canFinalizeRemoval;
-                
-                console.log("[SETUP-VALIDATION] Validação de botão de retirada:", {
-                    hasOrderNumber,
-                    photoValid,
-                    verificationValid,
-                    canFinalizeRemoval
-                });
-            }
         });
     }
     
@@ -302,101 +222,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Adicionar evento de submissão ao formulário para debug
-    if (setupForm) {
-        // Validação em tempo real do status do formulário
-        const statusElement = document.getElementById('setupFormStatus');
-        const formStatusTxt = document.getElementById('formStatusTxt');
-        const typeTxt = document.getElementById('typeTxt');
-        const btnStatusTxt = document.getElementById('btnStatusTxt');
-        
-        if (statusElement) {
-            // Mostrar o debug no modo de desenvolvimento
-            statusElement.classList.remove('d-none');
-            
-            // Atualizar status a cada 1s
-            setInterval(() => {
-                const currentType = setupType ? setupType.value : 'unknown';
-                const isValid = Object.values(formValidationState).every(v => v === true);
-                const btnStatus = finalizeButton ? (finalizeButton.disabled ? 'Desabilitado' : 'Habilitado') : 'N/A';
-                
-                formStatusTxt.textContent = isValid ? 'Válido' : 'Inválido';
-                typeTxt.textContent = currentType;
-                btnStatusTxt.textContent = btnStatus;
-                
-                // Atualizar classes de cores
-                if (isValid) {
-                    formStatusTxt.className = 'text-success';
-                } else {
-                    formStatusTxt.className = 'text-danger';
-                }
-                
-                // Imprimir detalhes no console
-                console.log("[SETUP-VALIDATION-DETAIL] Estado atual:", formValidationState);
-                console.log("[SETUP-VALIDATION-DETAIL] Tipo:", currentType);
-                console.log("[SETUP-VALIDATION-DETAIL] Botão:", btnStatus);
-            }, 1000);
-            
-            if (setupForm) {
-                setupForm.addEventListener('submit', function(e) {
-                    // Garantir que o formulário possa ser enviado e que o finalizeButton esteja habilitado
-                    const isFormValid = validateForm();
-                    
-                    if (!isFormValid) {
-                        e.preventDefault();
-                        console.error("[SETUP-VALIDATION] Formulário inválido, bloqueando envio", formValidationState);
-                    } else {
-                        console.log("[SETUP-VALIDATION] Formulário válido, enviando...");
-                    }
-                });
-            }
-        }
-    }
-    
     // Validar o formulário ao carregar a página
     setTimeout(validateForm, 500);
-    
-    // Exportar funções para o objeto global
-    setupFormValidation = {
-        // Função para atualizar a validação da foto
-        updatePhotoValidation: function(isValid) {
-            console.log("[SETUP-VALIDATION] Atualizando validação da foto:", isValid);
-            formValidationState.photo = isValid;
-            validateForm();
-            
-            // Se temos o botão finalizeButton, atualizar seu estado também
-            if (finalizeButton) {
-                const allValid = Object.values(formValidationState).every(value => value === true);
-                finalizeButton.disabled = !allValid;
-                
-                if (allValid) {
-                    finalizeButton.classList.add('btn-success');
-                    finalizeButton.classList.remove('btn-secondary');
-                } else {
-                    finalizeButton.classList.remove('btn-success');
-                    finalizeButton.classList.add('btn-secondary');
-                }
-            }
-        },
-        
-        // Função para validar manualmente o formulário
-        validateFormManually: function() {
-            return validateForm();
-        },
-        
-        // Função para verificar o estado atual da validação
-        getValidationState: function() {
-            return {...formValidationState};
-        },
-        
-        // Forçar habilitação do botão (para retirada)
-        enableFinalizeButton: function() {
-            console.log("[SETUP-VALIDATION] Forçando habilitação do botão de finalização");
-            if (finalizeButton) {
-                finalizeButton.disabled = false;
-                finalizeButton.classList.add('btn-success');
-                finalizeButton.classList.remove('btn-secondary');
-            }
-        }
-    };
 });

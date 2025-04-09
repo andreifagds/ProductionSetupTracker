@@ -218,15 +218,12 @@
     <label for="productSelection" class="form-label">Produto</label>
     <div class="row">
         <div class="col-md-4 mb-2 mb-md-0">
-            <input type="text" class="form-control" id="productCode" name="product_code" placeholder="Código" required>
-            <div class="invalid-feedback">
-                Por favor, informe o código do produto.
-            </div>
-            <input type="hidden" id="productName" name="product_name" required>
+            <input type="text" class="form-control" id="productCode" name="product_code" placeholder="Código">
+            <input type="hidden" id="productName" name="product_name">
             <input type="hidden" id="selectedItems" name="selected_items">
         </div>
         <div class="col-md-8">
-            <select class="form-select" id="productSelection" required>
+            <select class="form-select" id="productSelection">
                 <option value="" selected>Selecione um produto</option>
                 {% for product in cell_products %}
                 <option value="{{ product.code }}" data-name="{{ product.name }}">
@@ -234,9 +231,6 @@
                 </option>
                 {% endfor %}
             </select>
-            <div class="invalid-feedback">
-                Por favor, selecione um produto para esta célula.
-            </div>
         </div>
     </div>
     <div class="form-text" id="productHelp">Selecione ou digite o código do produto para esta célula.</div>
@@ -280,28 +274,11 @@
                                     </div>
                                 </div>
                                 
-                                <!-- Submit Button para Supply -->
-                                <div class="text-center" id="supplySubmitContainer">
+                                <!-- Submit Button -->
+                                <div class="text-center">
                                     <button type="submit" id="finalizeButton" class="btn btn-success" disabled>
                                         <i class="fa fa-check me-2"></i> Finalizar Cadastro
                                     </button>
-                                </div>
-                                
-                                <!-- Submit Button para Removal - Este botão NÃO depende da validação de produtos -->
-                                <div class="text-center" id="removalSubmitContainer" style="display: none;">
-                                    <button type="submit" id="finalizeRemovalButton" class="btn btn-success">
-                                        <i class="fa fa-check me-2"></i> Finalizar Retirada
-                                    </button>
-                                    <div class="small text-muted mt-1">
-                                        Depois de preencher número da ordem, foto e marcar a verificação, clique para finalizar
-                                    </div>
-                                </div>
-                                
-                                <!-- Log de status (apenas para debug) -->
-                                <div id="setupFormStatus" class="small text-muted mt-2 d-none">
-                                    <div class="mb-1">Status do Formulário: <span id="formStatusTxt">-</span></div>
-                                    <div class="mb-1">Tipo: <span id="typeTxt">-</span></div>
-                                    <div class="mb-1">Botão habilitado: <span id="btnStatusTxt">-</span></div>
                                 </div>
                             </form>
                         </div>
@@ -316,9 +293,10 @@
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/camera-scanner.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/setup-form-validation.js') }}"></script>
+    <script src="{{ url_for("static", filename="js/setup-form-validation.js") }}"></script>
     <script src="{{ url_for('static', filename='js/setup-products.js') }}"></script>
     <script src="{{ url_for('static', filename='js/product-selection.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/setup-form-validation.js') }}"></script>
     <script>
     // Script para carregar produtos da célula via API quando o QR code é escaneado
     document.addEventListener('DOMContentLoaded', function() {
@@ -554,12 +532,9 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Elementos do formulário
             const photoInput = document.getElementById('photoInput');
-            const carouselInner = document.getElementById('carouselInner');
+            const imagePreview = document.getElementById('imagePreview');
             const photoData = document.getElementById('photoData');
             const finalizeButton = document.getElementById('finalizeButton');
-            
-            // Variáveis para o carousel
-            let uploadedImages = [];
             const setupTypeSelectionContainer = document.getElementById('setupTypeSelectionContainer');
             const setupFormContainer = document.getElementById('setupFormContainer');
             const setupTypeRemovalBtn = document.getElementById('setupTypeRemoval');
@@ -652,28 +627,11 @@
                     operatorLabel.textContent = 'Operador da Retirada';
                     verificationLabel.textContent = 'Confirmo que verifiquei e retirei todos os materiais necessários';
                     
-                    // Ocultar campos de produtos para retirada
-                    const supplyFields = document.querySelectorAll('.supply-fields');
-                    supplyFields.forEach(field => {
-                        field.style.display = 'none';
-                    });
-                    
-                    // Configurar botões específicos para retirada
-                    document.getElementById('supplySubmitContainer').style.display = 'none';
-                    document.getElementById('removalSubmitContainer').style.display = 'block';
+                    // Se temos um número de ordem já digitado, preencher o campo
                     
                     // Mostrar formulário e esconder seleção
                     setupTypeSelectionContainer.style.display = 'none';
                     setupFormContainer.style.display = 'block';
-                    
-                    // Forçar o tipo para "removal" também no backend
-                    const typeInput = document.getElementById('setupType');
-                    if (typeInput) typeInput.value = 'removal';
-                    
-                    // Disparar evento para atualizar validação
-                    typeInput.dispatchEvent(new Event('change'));
-                    
-                    console.log("[SETUP] Formulário configurado para retirada");
                 });
                 
                 setupTypeSupplyBtn.addEventListener('click', function() {
@@ -685,149 +643,69 @@
                     operatorLabel.textContent = 'Abastecedor';
                     verificationLabel.textContent = 'Confirmo que verifiquei e abasteci todos os materiais necessários';
                     
-                    // Mostrar campos de produtos para abastecimento
-                    const supplyFields = document.querySelectorAll('.supply-fields');
-                    supplyFields.forEach(field => {
-                        field.style.display = 'block';
-                    });
-                    
-                    // Configurar botões específicos para abastecimento
-                    document.getElementById('supplySubmitContainer').style.display = 'block';
-                    document.getElementById('removalSubmitContainer').style.display = 'none';
+                    // Se temos um número de ordem já digitado, preencher o campo
                     
                     // Mostrar formulário e esconder seleção
                     setupTypeSelectionContainer.style.display = 'none';
                     setupFormContainer.style.display = 'block';
-                    
-                    console.log("[SETUP] Formulário configurado para abastecimento");
                 });
             }
             
             // Setup file input and preview handling
             if (photoInput) {
                 photoInput.addEventListener('change', async function() {
-                    // Limpar o carousel e a lista de imagens se houver uma nova seleção
-                    if (this.files.length > 0) {
-                        // Remover o placeholder e preparar o carousel
-                        carouselInner.innerHTML = '';
-                        uploadedImages = [];
+                    const file = this.files[0];
+                    if (file) {
+                        // Criar uma imagem temporária para redimensionamento
+                        const img = new Image();
+                        const reader = new FileReader();
                         
-                        // Processar cada arquivo
-                        const files = Array.from(this.files);
+                        reader.onload = function(e) {
+                            img.src = e.target.result;
+                        }
                         
-                        // Criar um array para armazenar as promessas de processamento
-                        const processingPromises = files.map(file => {
-                            return new Promise((resolve) => {
-                                const img = new Image();
-                                const reader = new FileReader();
-                                
-                                reader.onload = function(e) {
-                                    img.src = e.target.result;
-                                    
-                                    img.onload = function() {
-                                        // Criar canvas para redimensionamento
-                                        const canvas = document.createElement('canvas');
-                                        const MAX_WIDTH = 800;
-                                        const MAX_HEIGHT = 800;
-                                        
-                                        let width = img.width;
-                                        let height = img.height;
-                                        
-                                        // Calcular proporções
-                                        if (width > height) {
-                                            if (width > MAX_WIDTH) {
-                                                height *= MAX_WIDTH / width;
-                                                width = MAX_WIDTH;
-                                            }
-                                        } else {
-                                            if (height > MAX_HEIGHT) {
-                                                width *= MAX_HEIGHT / height;
-                                                height = MAX_HEIGHT;
-                                            }
-                                        }
-                                        
-                                        canvas.width = width;
-                                        canvas.height = height;
-                                        
-                                        // Desenhar e comprimir
-                                        const ctx = canvas.getContext('2d');
-                                        ctx.drawImage(img, 0, 0, width, height);
-                                        
-                                        // Converter para JPEG com qualidade reduzida
-                                        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
-                                        
-                                        // Adicionar à lista de imagens
-                                        uploadedImages.push(compressedDataUrl);
-                                        
-                                        resolve(compressedDataUrl);
-                                    };
-                                };
-                                
-                                reader.readAsDataURL(file);
-                            });
-                        });
-                        
-                        // Esperar que todas as imagens sejam processadas
-                        Promise.all(processingPromises).then(processedImages => {
-                            // Adicionar cada imagem ao carousel
-                            processedImages.forEach((dataUrl, index) => {
-                                const isActive = index === 0 ? 'active' : '';
-                                const carouselItem = document.createElement('div');
-                                carouselItem.className = `carousel-item ${isActive}`;
-                                carouselItem.innerHTML = `
-                                    <div class="d-flex justify-content-center">
-                                        <img src="${dataUrl}" class="img-fluid" style="max-height: 300px;">
-                                    </div>
-                                `;
-                                carouselInner.appendChild(carouselItem);
-                            });
+                        img.onload = function() {
+                            // Criar canvas para redimensionamento
+                            const canvas = document.createElement('canvas');
+                            const MAX_WIDTH = 800;
+                            const MAX_HEIGHT = 800;
                             
-                            // Adicionar controles se houver mais de uma imagem
-                            const carousel = document.getElementById('imagesCarousel');
-                            if (processedImages.length > 1) {
-                                // Adicionar controles do carousel
-                                if (!document.querySelector('.carousel-control-prev')) {
-                                    carousel.innerHTML += `
-                                        <button class="carousel-control-prev" type="button" data-bs-target="#imagesCarousel" data-bs-slide="prev">
-                                            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                            <span class="visually-hidden">Anterior</span>
-                                        </button>
-                                        <button class="carousel-control-next" type="button" data-bs-target="#imagesCarousel" data-bs-slide="next">
-                                            <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                            <span class="visually-hidden">Próximo</span>
-                                        </button>
-                                    `;
+                            let width = img.width;
+                            let height = img.height;
+                            
+                            // Calcular proporções
+                            if (width > height) {
+                                if (width > MAX_WIDTH) {
+                                    height *= MAX_WIDTH / width;
+                                    width = MAX_WIDTH;
                                 }
-                            }
-                            
-                            // Atualizar o contador de imagens
-                            const imageCounter = document.getElementById('imageCounter');
-                            if (imageCounter) {
-                                imageCounter.classList.remove('d-none');
-                                const badge = imageCounter.querySelector('.badge');
-                                if (badge) {
-                                    badge.textContent = `${processedImages.length} ${processedImages.length === 1 ? 'imagem selecionada' : 'imagens selecionadas'}`;
-                                }
-                            }
-                            
-                            // Salvar todas as imagens como JSON no campo oculto
-                            photoData.value = JSON.stringify(uploadedImages);
-                            
-                            // Atualizar estado de validação da foto
-                            if (typeof setupFormValidation != 'undefined' && 
-                                typeof setupFormValidation.updatePhotoValidation === 'function') {
-                                setupFormValidation.updatePhotoValidation(true);
                             } else {
-                                console.warn("setupFormValidation não disponível, usando método legado");
-                                if (finalizeButton) finalizeButton.disabled = false;
-                                
-                                // Habilitar também o botão de retirada se estamos no modo de retirada
-                                const finalizeRemovalButton = document.getElementById('finalizeRemovalButton');
-                                if (finalizeRemovalButton && setupType && setupType.value === 'removal') {
-                                    finalizeRemovalButton.disabled = false;
+                                if (height > MAX_HEIGHT) {
+                                    width *= MAX_HEIGHT / height;
+                                    height = MAX_HEIGHT;
                                 }
                             }
-                        });
+                            
+                            canvas.width = width;
+                            canvas.height = height;
+                            
+                            // Desenhar e comprimir
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, width, height);
+                            
+                            // Converter para JPEG com qualidade reduzida
+                            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                            
+                            // Atualizar preview e dados
+                            imagePreview.src = compressedDataUrl;
+                            imagePreview.style.display = 'block';
+                            photoData.value = compressedDataUrl;
+                            
+                            // Enable finalize button
+                            finalizeButton.disabled = false;
+                        }
+                        
+                        reader.readAsDataURL(file);
                     }
                 });
             }
