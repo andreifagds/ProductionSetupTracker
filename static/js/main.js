@@ -321,11 +321,29 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Function to update a setup via API
-function updateSetup(cellName, orderNumber) {
-    const modal = document.getElementById('editSetupModal');
-    const supplierName = modal.querySelector('#editSupplierName').value;
-    const observation = modal.querySelector('#editObservation').value;
-    const verificationCheck = modal.querySelector('#editVerificationCheck').checked;
+function updateSetup(cellName, orderNumber, supplierName, observation, verificationCheck, audited, auditorName, setupType, photoData, timestamp) {
+    let modal;
+    let saveBtn;
+    let originalBtnText;
+    
+    // Se os parâmetros não foram fornecidos, obtê-los do modal
+    if (arguments.length < 3) {
+        modal = document.getElementById('editSetupModal');
+        supplierName = modal.querySelector('#editSupplierName').value;
+        observation = modal.querySelector('#editObservation').value;
+        verificationCheck = modal.querySelector('#editVerificationCheck').checked;
+        setupType = modal.querySelector('#editSetupType')?.value;
+        photoData = modal.querySelector('#editPhotoData')?.value;
+        timestamp = modal.querySelector('#editTimestamp')?.value;
+        
+        // Obter referência ao botão de salvar dentro do modal
+        saveBtn = modal.querySelector('#saveSetupBtn');
+        originalBtnText = saveBtn.innerHTML;
+        
+        // Mostrar indicador de loading
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Salvando...';
+        saveBtn.disabled = true;
+    }
     
     // Create data object
     const data = {
@@ -336,11 +354,12 @@ function updateSetup(cellName, orderNumber) {
         verification_check: verificationCheck
     };
     
-    // Show loading indicator
-    const saveBtn = modal.querySelector('#saveSetupBtn');
-    const originalBtnText = saveBtn.innerHTML;
-    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Salvando...';
-    saveBtn.disabled = true;
+    // Adicionar parâmetros opcionais se fornecidos
+    if (audited !== undefined) data.audited = audited;
+    if (auditorName) data.auditor_name = auditorName;
+    if (setupType) data.setup_type = setupType;
+    if (photoData) data.photo_data = photoData;
+    if (timestamp) data.timestamp = timestamp;
     
     // Send API request
     fetch('/api/update_setup', {
@@ -351,43 +370,55 @@ function updateSetup(cellName, orderNumber) {
         body: JSON.stringify(data)
     })
     .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Close modal
-            bootstrap.Modal.getInstance(modal).hide();
+    .then(responseData => {
+        if (responseData.success) {
+            // Close modal se estiver definido
+            if (modal) {
+                const modalInstance = bootstrap.Modal.getInstance(modal);
+                if (modalInstance) modalInstance.hide();
+            }
             
             // Show success message
             const alertContainer = document.getElementById('alertContainer');
-            alertContainer.innerHTML = `
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    Setup atualizado com sucesso!
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            `;
-            
-            // Refresh the page after a short delay
-            setTimeout(() => {
+            if (alertContainer) {
+                alertContainer.innerHTML = `
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        Setup atualizado com sucesso!
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                `;
+                
+                // Refresh the page after a short delay
+                setTimeout(() => {
+                    location.reload();
+                }, 2000);
+            } else {
+                // No caso de chamada direta (sem UI), apenas recarregar a página
                 location.reload();
-            }, 2000);
+            }
         } else {
-            throw new Error(data.message || 'Erro ao atualizar setup');
+            throw new Error(responseData.message || 'Erro ao atualizar setup');
         }
     })
     .catch(error => {
         console.error('Error:', error);
         
-        // Show error message
+        // Show error message if UI exists
         const alertContainer = document.getElementById('alertContainer');
-        alertContainer.innerHTML = `
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                ${error.message || 'Erro ao atualizar setup'}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        `;
+        if (alertContainer) {
+            alertContainer.innerHTML = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    ${error.message || 'Erro ao atualizar setup'}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+        }
     })
     .finally(() => {
-        // Restore button
-        saveBtn.innerHTML = originalBtnText;
-        saveBtn.disabled = false;
+        // Restore button if it exists
+        if (saveBtn) {
+            saveBtn.innerHTML = originalBtnText;
+            saveBtn.disabled = false;
+        }
     });
 }

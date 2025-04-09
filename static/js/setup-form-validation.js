@@ -1,10 +1,14 @@
 // Script para validação do formulário de setup e habilitação do botão de envio
+// Criar objeto global para permitir acesso externo a funções específicas
+var setupFormValidation = {};
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("[SETUP-VALIDATION] Inicializando validação do formulário de setup");
     
     // Elementos do formulário
     const setupForm = document.getElementById('setupForm');
     const submitButton = document.getElementById('submitSetupBtn');
+    const finalizeButton = document.getElementById('finalizeButton'); // Botão usado no modo formulário
     const setupType = document.getElementById('setupType');
     const orderNumber = document.getElementById('orderNumber');
     const supplierName = document.getElementById('supplierName');
@@ -224,4 +228,38 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Validar o formulário ao carregar a página
     setTimeout(validateForm, 500);
+    
+    // Exportar funções para o objeto global
+    setupFormValidation = {
+        // Função para atualizar a validação da foto
+        updatePhotoValidation: function(isValid) {
+            console.log("[SETUP-VALIDATION] Atualizando validação da foto:", isValid);
+            formValidationState.photo = isValid;
+            validateForm();
+            
+            // Se temos o botão finalizeButton, atualizar seu estado também
+            if (finalizeButton) {
+                const allValid = Object.values(formValidationState).every(value => value === true);
+                finalizeButton.disabled = !allValid;
+                
+                if (allValid) {
+                    finalizeButton.classList.add('btn-success');
+                    finalizeButton.classList.remove('btn-secondary');
+                } else {
+                    finalizeButton.classList.remove('btn-success');
+                    finalizeButton.classList.add('btn-secondary');
+                }
+            }
+        },
+        
+        // Função para validar manualmente o formulário
+        validateFormManually: function() {
+            return validateForm();
+        },
+        
+        // Função para verificar o estado atual da validação
+        getValidationState: function() {
+            return {...formValidationState};
+        }
+    };
 });

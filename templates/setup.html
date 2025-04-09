@@ -299,10 +299,9 @@
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/camera-scanner.js') }}"></script>
-    <script src="{{ url_for("static", filename="js/setup-form-validation.js") }}"></script>
+    <script src="{{ url_for('static', filename='js/setup-form-validation.js') }}"></script>
     <script src="{{ url_for('static', filename='js/setup-products.js') }}"></script>
     <script src="{{ url_for('static', filename='js/product-selection.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/setup-form-validation.js') }}"></script>
     <script>
     // Script para carregar produtos da célula via API quando o QR code é escaneado
     document.addEventListener('DOMContentLoaded', function() {
@@ -707,8 +706,15 @@
                             imagePreview.style.display = 'block';
                             photoData.value = compressedDataUrl;
                             
-                            // Enable finalize button
-                            finalizeButton.disabled = false;
+                            // Atualizar estado de validação da foto
+                            // Agora será tratado pelo setupFormValidation
+                            if (typeof setupFormValidation != 'undefined' && 
+                                typeof setupFormValidation.updatePhotoValidation === 'function') {
+                                setupFormValidation.updatePhotoValidation(true);
+                            } else {
+                                console.warn("setupFormValidation não disponível, usando método legado");
+                                finalizeButton.disabled = false;
+                            }
                         }
                         
                         reader.readAsDataURL(file);
