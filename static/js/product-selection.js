@@ -202,8 +202,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 selectedItem.code === item.code
             );
             
-            // Verificar se o item já está selecionado
+            // Buscar o valor do PO do fornecedor se o item já estiver selecionado
+            let supplierPO = '';
             const existingItem = selectedItemsList.find(selectedItem => selectedItem.code === item.code);
+            if (existingItem && existingItem.supplierPO) {
+                supplierPO = existingItem.supplierPO;
+            }
             
             const itemElement = document.createElement('div');
             itemElement.className = 'col-md-12 mb-3';
@@ -217,7 +221,21 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <strong>${item.code}</strong> - ${item.name}
                             </label>
                         </div>
-                        <!-- Container para informações adicionais do item se necessário no futuro -->
+                        <div class="supplier-po-container mt-2 ${isChecked ? '' : 'd-none'}">
+                            <div class="row">
+                                <div class="col">
+                                    <label for="supplierPO_${item.code}" class="form-label">PO do Fornecedor</label>
+                                    <input type="text" class="form-control supplier-po-input" 
+                                           id="supplierPO_${item.code}" 
+                                           data-item-code="${item.code}"
+                                           placeholder="Digite o PO do fornecedor" 
+                                           value="${supplierPO}" required>
+                                    <div class="invalid-feedback">
+                                        PO do fornecedor é obrigatório para este item.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -226,15 +244,25 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Adicionar listener para o checkbox
             const checkbox = itemElement.querySelector('.item-checkbox');
+            const supplierPOContainer = itemElement.querySelector('.supplier-po-container');
+            const supplierPOInput = itemElement.querySelector('.supplier-po-input');
             
             checkbox.addEventListener('change', function() {
                 if (this.checked) {
+                    // Mostrar campo de PO do fornecedor
+                    supplierPOContainer.classList.remove('d-none');
+                    supplierPOInput.focus();
+                    
                     // Adicionar item à lista de selecionados
                     selectedItemsList.push({
                         code: this.value,
-                        name: this.getAttribute('data-name')
+                        name: this.getAttribute('data-name'),
+                        supplierPO: supplierPOInput.value
                     });
                 } else {
+                    // Esconder campo de PO do fornecedor
+                    supplierPOContainer.classList.add('d-none');
+                    
                     // Remover item da lista de selecionados
                     selectedItemsList = selectedItemsList.filter(item => 
                         item.code !== this.value
@@ -244,6 +272,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Atualizar campo oculto com os itens selecionados
                 updateSelectedItemsField();
             });
+            
+            // Adicionar listener para atualizar o PO do fornecedor quando o usuário digitar
+            supplierPOInput.addEventListener('input', function() {
+                const itemCode = this.getAttribute('data-item-code');
+                const itemIndex = selectedItemsList.findIndex(item => item.code === itemCode);
+                
+                if (itemIndex >= 0) {
+                    selectedItemsList[itemIndex].supplierPO = this.value;
+                    updateSelectedItemsField();
+                }
+                
+                // Validar o campo
+                if (this.value.trim() === '') {
+                    this.classList.add('is-invalid');
+                } else {
+                    this.classList.remove('is-invalid');
+                }
+            });
+            
+            // Validação inicial do campo de PO se o item estiver selecionado
+            if (isChecked && supplierPOInput.value.trim() === '') {
+                supplierPOInput.classList.add('is-invalid');
+            }
         });
         
         noItemsMessage.style.display = 'none';

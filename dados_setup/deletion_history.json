@@ -75,5 +75,31 @@
       "has_image": true,
       "main_image": "oshsicbekfn_removal_2025-04-14_02-59-05/image_1.jpg"
     }
+  },
+  {
+    "timestamp": "2025-04-15 05:20:36",
+    "cell_name": "4000004399",
+    "order_number": "112233",
+    "setup_type": "removal",
+    "deleted_by": "admin",
+    "setup_data": {
+      "order_number": "112233",
+      "supplier_name": "cleiton",
+      "timestamp": "2025-04-14_02-58-27",
+      "observation": "Faltou retirar o item X",
+      "verification_check": true,
+      "setup_type": "removal",
+      "audited": false,
+      "images": [
+        {
+          "filename": "image_1.jpg",
+          "path": "112233_removal_2025-04-14_02-58-27/image_1.jpg"
+        }
+      ],
+      "has_image": true,
+      "main_image": "112233_removal_2025-04-14_02-58-27/image_1.jpg",
+      "auditor_name": "",
+      "audit_notes": ""
+    }
   }
 ]
