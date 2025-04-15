@@ -278,7 +278,6 @@
                                                     {% if setup.setup_type == 'supply' %}
                                                     data-product-code="{{ setup.product_code|default('') }}"
                                                     data-product-name="{{ setup.product_name|default('') }}"
-                                                    data-product-po="{{ setup.product_po|default('') }}"
                                                     data-selected-items="{{ setup.selected_items|default([])|tojson|replace('"', '&quot;') }}"
                                                     {% endif %}
                                                 >
