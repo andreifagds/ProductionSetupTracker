@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histórico de Exclusões - Sistema de Abastecimento</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom-green-theme.css') }}">
+</head>
+<body>
+    <div class="container mt-4">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-success mb-4">
+            <a class="navbar-brand" href="/">Sistema de Abastecimento</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav mr-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">Início</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/setup">Registro</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/audit">Auditoria</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/register_qrcode">QR Codes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/product_management">Produtos</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/user_management">Usuários</a>
+                    </li>
+                    <li class="nav-item active">
+                        <a class="nav-link" href="/deletion_history">Histórico de Exclusões</a>
+                    </li>
+                </ul>
+                <div class="navbar-text text-white">
+                    Olá, {{ session.get('username', 'Visitante') }}
+                    {% if session.get('logged_in') %}
+                    | <a href="/logout" class="text-white">Sair</a>
+                    {% else %}
+                    | <a href="/login" class="text-white">Entrar</a>
+                    {% endif %}
+                </div>
+            </div>
+        </nav>
+
+        <h1 class="mb-4">Histórico de Exclusões</h1>
+        
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Registro de Exclusões</h5>
+            </div>
+            <div class="card-body">
+                {% if deletion_history %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th>Data/Hora</th>
+                                    <th>Célula</th>
+                                    <th>Ordem</th>
+                                    <th>Tipo</th>
+                                    <th>Excluído por</th>
+                                    <th>Detalhes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in deletion_history %}
+                                <tr>
+                                    <td>{{ entry.timestamp }}</td>
+                                    <td>{{ entry.cell_name }}</td>
+                                    <td>{{ entry.order_number }}</td>
+                                    <td>
+                                        {% if entry.setup_type == 'supply' %}
+                                            <span class="badge badge-primary">Abastecimento</span>
+                                        {% elif entry.setup_type == 'removal' %}
+                                            <span class="badge badge-warning">Retirada</span>
+                                        {% else %}
+                                            <span class="badge badge-secondary">{{ entry.setup_type }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ entry.deleted_by }}</td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-info" data-toggle="modal" data-target="#detailsModal-{{ loop.index }}">
+                                            Ver Detalhes
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% for entry in deletion_history %}
+                    <!-- Modal de Detalhes para cada entrada -->
+                    <div class="modal fade" id="detailsModal-{{ loop.index }}" tabindex="-1" role="dialog" aria-labelledby="detailsModalLabel-{{ loop.index }}" aria-hidden="true">
+                        <div class="modal-dialog modal-lg" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header bg-success text-white">
+                                    <h5 class="modal-title" id="detailsModalLabel-{{ loop.index }}">Detalhes da Exclusão</h5>
+                                    <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p><strong>Data/Hora:</strong> {{ entry.timestamp }}</p>
+                                            <p><strong>Célula:</strong> {{ entry.cell_name }}</p>
+                                            <p><strong>Ordem de Produção:</strong> {{ entry.order_number }}</p>
+                                            <p><strong>Tipo de Operação:</strong> 
+                                                {% if entry.setup_type == 'supply' %}
+                                                    Abastecimento
+                                                {% elif entry.setup_type == 'removal' %}
+                                                    Retirada
+                                                {% else %}
+                                                    {{ entry.setup_type }}
+                                                {% endif %}
+                                            </p>
+                                            <p><strong>Excluído por:</strong> {{ entry.deleted_by }}</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            {% if entry.setup_data %}
+                                                <p><strong>Dados do Registro Excluído:</strong></p>
+                                                <div class="setup-details">
+                                                    {% if entry.setup_data.supplier_name %}
+                                                        <p><strong>Abastecedor:</strong> {{ entry.setup_data.supplier_name }}</p>
+                                                    {% endif %}
+                                                    
+                                                    {% if entry.setup_data.observation %}
+                                                        <p><strong>Observação:</strong> {{ entry.setup_data.observation }}</p>
+                                                    {% endif %}
+                                                    
+                                                    {% if entry.setup_data.verification_check %}
+                                                        <p><strong>Verificação:</strong> 
+                                                            {% if entry.setup_data.verification_check == "true" or entry.setup_data.verification_check == true %}
+                                                                <span class="text-success">✓ Realizada</span>
+                                                            {% else %}
+                                                                <span class="text-danger">✗ Não realizada</span>
+                                                            {% endif %}
+                                                        </p>
+                                                    {% endif %}
+                                                    
+                                                    {% if entry.setup_data.audited %}
+                                                        <p><strong>Auditado:</strong> 
+                                                            {% if entry.setup_data.audited == "true" or entry.setup_data.audited == true %}
+                                                                <span class="text-success">✓ Sim</span>
+                                                            {% else %}
+                                                                <span class="text-danger">✗ Não</span>
+                                                            {% endif %}
+                                                        </p>
+                                                    {% endif %}
+                                                    
+                                                    {% if entry.setup_data.auditor_name %}
+                                                        <p><strong>Auditor:</strong> {{ entry.setup_data.auditor_name }}</p>
+                                                    {% endif %}
+                                                    
+                                                    {% if entry.setup_data.audit_timestamp %}
+                                                        <p><strong>Data da Auditoria:</strong> {{ entry.setup_data.audit_timestamp }}</p>
+                                                    {% endif %}
+                                                </div>
+                                                
+                                                {% if entry.setup_type == 'supply' and entry.setup_data.product_code %}
+                                                    <div class="product-details mt-3">
+                                                        <p><strong>Detalhes do Produto:</strong></p>
+                                                        <p><strong>Código:</strong> {{ entry.setup_data.product_code }}</p>
+                                                        {% if entry.setup_data.product_name %}
+                                                            <p><strong>Nome:</strong> {{ entry.setup_data.product_name }}</p>
+                                                        {% endif %}
+                                                        {% if entry.setup_data.product_po %}
+                                                            <p><strong>PO:</strong> {{ entry.setup_data.product_po }}</p>
+                                                        {% endif %}
+                                                        
+                                                        {% if entry.setup_data.selected_items and entry.setup_data.selected_items|length > 0 %}
+                                                            <p><strong>Itens:</strong></p>
+                                                            <ul>
+                                                                {% for item in entry.setup_data.selected_items %}
+                                                                    <li>
+                                                                        <strong>{{ item.item_code }}</strong>: {{ item.item_name }}
+                                                                        {% if item.item_po %}
+                                                                            (PO: {{ item.item_po }})
+                                                                        {% endif %}
+                                                                    </li>
+                                                                {% endfor %}
+                                                            </ul>
+                                                        {% endif %}
+                                                    </div>
+                                                {% endif %}
+                                            {% else %}
+                                                <p class="text-muted">Dados detalhados não disponíveis para este registro.</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Fechar</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                {% else %}
+                    <div class="alert alert-info">
+                        Nenhum registro de exclusão encontrado.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    {% include 'footer.html' %}
+</body>
+</html>
