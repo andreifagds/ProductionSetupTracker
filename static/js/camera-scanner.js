@@ -161,105 +161,61 @@ function onQRCodeDetected(qrCode) {
                         const supplyCard = document.querySelector('.card[data-setup-type="supply"]') || 
                                           setupTypeSupplyBtn?.closest('.card');
                         
-                        if (data.setup_status.removal && data.setup_status.supply) {
+                        // Lista de registros existentes para exibição
+                        let existingRecords = [];
+                        if (data.setup_status.removal) existingRecords.push("Retirada");
+                        if (data.setup_status.supply) existingRecords.push("Abastecimento");
+                        
+                        if (existingRecords.length > 0) {
+                            // Mostrar mensagem informativa sobre registros existentes
                             setupTypeStatus.innerHTML = `
-                                <strong>Status:</strong> Todos os registros estão completos. 
-                                Você pode iniciar um novo ciclo de registros.
+                                <strong>Status:</strong> Registros já realizados: ${existingRecords.join(' e ')}. 
+                                <br>Você pode realizar qualquer operação a qualquer momento.
                             `;
-                            setupTypeStatus.className = 'alert alert-success mb-4';
+                            setupTypeStatus.className = 'alert alert-info mb-4';
                             
-                            // Habilitar ambos os botões
-                            if (setupTypeRemovalBtn) setupTypeRemovalBtn.disabled = false;
-                            if (setupTypeSupplyBtn) setupTypeSupplyBtn.disabled = false;
-                            
-                            // Atualizar estilo dos cards
+                            // Atualizar estilo dos cards sem desabilitar nenhum
                             if (removalCard) {
-                                removalCard.classList.remove('disabled', 'completed', 'pending');
-                                removalCard.classList.add('completed');
+                                removalCard.classList.remove('disabled');
+                                if (data.setup_status.removal) {
+                                    removalCard.classList.add('completed');
+                                } else {
+                                    removalCard.classList.remove('completed');
+                                }
                             }
                             if (supplyCard) {
-                                supplyCard.classList.remove('disabled', 'completed', 'pending');
-                                supplyCard.classList.add('completed');
+                                supplyCard.classList.remove('disabled');
+                                if (data.setup_status.supply) {
+                                    supplyCard.classList.add('completed');
+                                } else {
+                                    supplyCard.classList.remove('completed');
+                                }
                             }
-                        } 
-                        else if (data.setup_status.removal) {
-                            setupTypeStatus.innerHTML = `
-                                <strong>Status:</strong> Retirada de material já registrada. 
-                                Você pode registrar o abastecimento de novos materiais.
-                            `;
-                            setupTypeStatus.className = 'alert alert-warning mb-4';
-                            
-                            // Desabilitar botão de retirada e habilitar o de abastecimento
-                            if (setupTypeRemovalBtn) {
-                                setupTypeRemovalBtn.disabled = true;
-                                setupTypeRemovalBtn.classList.add('disabled');
-                            }
-                            if (setupTypeSupplyBtn) {
-                                setupTypeSupplyBtn.disabled = false;
-                                setupTypeSupplyBtn.classList.remove('disabled');
-                            }
-                            
-                            // Atualizar estilo dos cards
-                            if (removalCard) {
-                                removalCard.classList.remove('pending', 'completed');
-                                removalCard.classList.add('disabled', 'completed');
-                            }
-                            if (supplyCard) {
-                                supplyCard.classList.remove('disabled', 'completed');
-                                supplyCard.classList.add('pending');
-                            }
-                        } 
-                        else if (data.setup_status.supply) {
-                            setupTypeStatus.innerHTML = `
-                                <strong>Status:</strong> Abastecimento de material já registrado. 
-                                Você pode registrar a retirada de materiais.
-                            `;
-                            setupTypeStatus.className = 'alert alert-warning mb-4';
-                            
-                            // Habilitar botão de retirada e desabilitar o de abastecimento
-                            if (setupTypeRemovalBtn) {
-                                setupTypeRemovalBtn.disabled = false;
-                                setupTypeRemovalBtn.classList.remove('disabled');
-                            }
-                            if (setupTypeSupplyBtn) {
-                                setupTypeSupplyBtn.disabled = true;
-                                setupTypeSupplyBtn.classList.add('disabled');
-                            }
-                            
-                            // Atualizar estilo dos cards
-                            if (removalCard) {
-                                removalCard.classList.remove('disabled', 'completed');
-                                removalCard.classList.add('pending');
-                            }
-                            if (supplyCard) {
-                                supplyCard.classList.remove('pending', 'completed');
-                                supplyCard.classList.add('disabled', 'completed');
-                            }
-                        } 
-                        else {
+                        } else {
+                            // Nenhum registro encontrado
                             setupTypeStatus.innerHTML = `
                                 <strong>Status:</strong> Nenhum registro encontrado para esta célula. 
                                 Escolha qualquer operação para iniciar.
                             `;
                             setupTypeStatus.className = 'alert alert-info mb-4';
                             
-                            // Habilitar ambos os botões
-                            if (setupTypeRemovalBtn) {
-                                setupTypeRemovalBtn.disabled = false;
-                                setupTypeRemovalBtn.classList.remove('disabled');
-                            }
-                            if (setupTypeSupplyBtn) {
-                                setupTypeSupplyBtn.disabled = false;
-                                setupTypeSupplyBtn.classList.remove('disabled');
-                            }
-                            
-                            // Atualizar estilo dos cards
+                            // Limpar estilos dos cards
                             if (removalCard) {
                                 removalCard.classList.remove('disabled', 'completed', 'pending');
                             }
                             if (supplyCard) {
                                 supplyCard.classList.remove('disabled', 'completed', 'pending');
                             }
+                        }
+                        
+                        // Sempre habilitar ambos os botões, independentemente do status
+                        if (setupTypeRemovalBtn) {
+                            setupTypeRemovalBtn.disabled = false;
+                            setupTypeRemovalBtn.classList.remove('disabled');
+                        }
+                        if (setupTypeSupplyBtn) {
+                            setupTypeSupplyBtn.disabled = false;
+                            setupTypeSupplyBtn.classList.remove('disabled');
                         }
                     }
                     
