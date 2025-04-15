@@ -614,49 +614,37 @@
                 }
             }
             
-            // Função para mostrar status do setup
+            // Função para mostrar status do setup - sem restrições de fluxo
             function updateSetupStatusDisplay(statusData) {
                 if (!setupTypeStatus) return;
                 
                 setupTypeStatus.style.display = 'block';
                 
-                if (statusData.has_removal && statusData.has_supply) {
-                    // Ambos os setups já foram registrados
-                    setupTypeStatus.className = 'alert alert-success mb-4';
-                    setupTypeStatus.innerHTML = `
-                        <i class="fa fa-check-circle me-2"></i>
-                        <strong>Setup Completo:</strong> Retirada e abastecimento já foram registrados para esta ordem.
-                    `;
-                    setupTypeRemovalBtn.disabled = true;
-                    setupTypeSupplyBtn.disabled = true;
-                } else if (statusData.has_removal) {
-                    // Apenas retirada foi registrada
-                    setupTypeStatus.className = 'alert alert-warning mb-4';
-                    setupTypeStatus.innerHTML = `
-                        <i class="fa fa-exclamation-triangle me-2"></i>
-                        <strong>Retirada Registrada:</strong> Apenas o abastecimento ainda precisa ser registrado.
-                    `;
-                    setupTypeRemovalBtn.disabled = true;
-                    setupTypeSupplyBtn.disabled = false;
-                } else if (statusData.has_supply) {
-                    // Apenas abastecimento foi registrado
-                    setupTypeStatus.className = 'alert alert-warning mb-4';
-                    setupTypeStatus.innerHTML = `
-                        <i class="fa fa-exclamation-triangle me-2"></i>
-                        <strong>Abastecimento Registrado:</strong> Apenas a retirada ainda precisa ser registrada.
-                    `;
-                    setupTypeRemovalBtn.disabled = false;
-                    setupTypeSupplyBtn.disabled = true;
-                } else {
-                    // Nenhum setup foi registrado
+                // Lista informativa dos registros existentes
+                let existingRecords = [];
+                if (statusData.has_removal) existingRecords.push("Retirada");
+                if (statusData.has_supply) existingRecords.push("Abastecimento");
+                
+                if (existingRecords.length > 0) {
+                    // Registros existentes encontrados
                     setupTypeStatus.className = 'alert alert-info mb-4';
                     setupTypeStatus.innerHTML = `
                         <i class="fa fa-info-circle me-2"></i>
-                        <strong>Novo Setup:</strong> Nenhum registro encontrado para esta ordem. Por favor, registre a retirada e o abastecimento.
+                        <strong>Registros existentes:</strong> ${existingRecords.join(' e ')} já registrados para esta ordem.
+                        <br>Você pode adicionar novos registros a qualquer momento.
                     `;
-                    setupTypeRemovalBtn.disabled = false;
-                    setupTypeSupplyBtn.disabled = false;
+                } else {
+                    // Nenhum registro encontrado
+                    setupTypeStatus.className = 'alert alert-info mb-4';
+                    setupTypeStatus.innerHTML = `
+                        <i class="fa fa-info-circle me-2"></i>
+                        <strong>Novo Setup:</strong> Nenhum registro encontrado para esta ordem.
+                    `;
                 }
+                
+                // Sempre permitir ambos os tipos de operação
+                setupTypeRemovalBtn.disabled = false;
+                setupTypeSupplyBtn.disabled = false;
             }
             
             // Configurar eventos para os botões de tipo de setup
@@ -764,36 +752,36 @@
 </body>
 </html>
 
-    <!-- Modal de Reset de Fluxo da Célula -->
+    <!-- Modal de Registro de Evento -->
     <div class="modal fade" id="resetCellModal" tabindex="-1" aria-labelledby="resetCellModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header bg-warning text-dark">
+                <div class="modal-header bg-info text-dark">
                     <h5 class="modal-title" id="resetCellModalLabel">
-                        <i class="fa fa-refresh me-2"></i> Resetar Fluxo da Célula
+                        <i class="fa fa-info-circle me-2"></i> Registrar Evento para Célula
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="alert alert-warning">
-                        <i class="fa fa-exclamation-triangle me-2"></i>
-                        <strong>Atenção!</strong> Esta operação irá resetar o fluxo da célula, permitindo tanto retirada quanto abastecimento.
+                    <p class="alert alert-info">
+                        <i class="fa fa-info-circle me-2"></i>
+                        <strong>Informação:</strong> Esta função agora apenas registra um evento para a célula. Não há mais restrições de fluxo, e qualquer operação pode ser realizada a qualquer momento.
                     </p>
                     
                     <p>Célula: <strong id="resetCellName"></strong></p>
                     
                     <div class="mb-3">
-                        <label for="resetReason" class="form-label">Motivo do Reset (obrigatório)</label>
+                        <label for="resetReason" class="form-label">Motivo do Registro (obrigatório)</label>
                         <textarea class="form-control" id="resetReason" rows="3" required></textarea>
                         <div class="invalid-feedback">
-                            Por favor, informe o motivo do reset da célula.
+                            Por favor, informe o motivo do registro para esta célula.
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-warning" id="confirmResetBtn">
-                        <i class="fa fa-refresh me-2"></i> Confirmar Reset
+                    <button type="button" class="btn btn-info" id="confirmResetBtn">
+                        <i class="fa fa-save me-2"></i> Registrar Evento
                     </button>
                 </div>
             </div>

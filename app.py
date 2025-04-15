@@ -1383,7 +1383,9 @@ def setup():
 def check_setup_status():
     """API para verificar o status dos setups para uma célula e ordem de produção específica.
     
-    Verifica se já existem registros de retirada e abastecimento para a ordem.
+    Com a remoção da lógica de fluxo de célula, esta função agora simplesmente retorna 
+    informações sobre os registros existentes, sem impor restrições. 
+    Ambos os tipos de operação são sempre permitidos.
     """
     cell_name = request.args.get('cell_name')
     order_number = request.args.get('order_number')
@@ -1401,44 +1403,12 @@ def check_setup_status():
     has_removal = False
     has_supply = False
     
-    # Data e hora do reset mais recente (se houver)
-    last_reset_timestamp = None
-    
-    # Verificar se houve reset recente
-    resets_dir = os.path.join(cell_dir, "resets")
-    if os.path.isdir(resets_dir):
-        # Procurar pelo arquivo de histórico de resets
-        history_file = os.path.join(resets_dir, "reset_history.json")
-        if os.path.exists(history_file):
-            try:
-                with open(history_file, 'r') as f:
-                    history = json.load(f)
-                
-                # Obter o timestamp do reset mais recente
-                if history and len(history) > 0:
-                    # Ordenar pelo timestamp (mais recente primeiro)
-                    sorted_history = sorted(history, key=lambda x: x.get('timestamp', ''), reverse=True)
-                    last_reset = sorted_history[0]
-                    last_reset_timestamp = datetime.datetime.strptime(last_reset.get('timestamp', ''), '%Y-%m-%d %H-%M-%S')
-                    logging.debug(f"Reset mais recente em: {last_reset_timestamp}")
-            except Exception as e:
-                logging.error(f"Erro ao ler histórico de resets: {e}")
-    
     # Verificar arquivos de setup específicos para esta ordem
     if os.path.isdir(cell_dir):
         for file in os.listdir(cell_dir):
             if file.endswith(".txt") and file.startswith(f"{order_number}_"):
                 file_path = os.path.join(cell_dir, file)
                 try:
-                    # Verificar se o arquivo foi criado após o último reset
-                    file_mtime = os.path.getmtime(file_path)
-                    file_timestamp = datetime.datetime.fromtimestamp(file_mtime)
-                    
-                    # Ignorar arquivos criados antes do último reset (se houver)
-                    if last_reset_timestamp and file_timestamp < last_reset_timestamp:
-                        logging.debug(f"Ignorando arquivo anterior ao reset: {file}")
-                        continue
-                        
                     with open(file_path, 'r') as f:
                         data = json.load(f)
                     
@@ -1454,7 +1424,7 @@ def check_setup_status():
         "success": True,
         "has_removal": has_removal,
         "has_supply": has_supply,
-        "message": "Status verificado com sucesso"
+        "message": "Status verificado com sucesso. Qualquer tipo de operação é permitido."
     })
 
 @app.route('/audit')
@@ -1668,54 +1638,22 @@ def api_get_cell_name(qrcode):
     # Obter último número de ordem usado na célula (se houver)
     most_recent_order = None
     
-    # Data e hora do reset mais recente (se houver)
-    last_reset_timestamp = None
-    
-    # Verificar se houve reset recente
-    cell_dir = os.path.join(DATA_DIR, cell_name)
-    resets_dir = os.path.join(cell_dir, "resets")
-    
-    if os.path.isdir(resets_dir):
-        # Procurar pelo arquivo de histórico de resets
-        history_file = os.path.join(resets_dir, "reset_history.json")
-        if os.path.exists(history_file):
-            try:
-                with open(history_file, 'r') as f:
-                    history = json.load(f)
-                
-                # Obter o timestamp do reset mais recente
-                if history and len(history) > 0:
-                    # Ordenar pelo timestamp (mais recente primeiro)
-                    sorted_history = sorted(history, key=lambda x: x.get('timestamp', ''), reverse=True)
-                    last_reset = sorted_history[0]
-                    last_reset_timestamp = datetime.datetime.strptime(last_reset.get('timestamp', ''), '%Y-%m-%d %H-%M-%S')
-                    logging.debug(f"Reset mais recente em: {last_reset_timestamp}")
-            except Exception as e:
-                logging.error(f"Erro ao ler histórico de resets: {e}")
-    
     # Verificar os arquivos na célula para determinar o status
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    
     if os.path.isdir(cell_dir):
-        # Primeiro, procurar o número de ordem mais recente
+        # Procurar o número de ordem mais recente
         setup_files = []
         for file in os.listdir(cell_dir):
             if file.endswith(".txt") and not file.startswith("reset_log_"):
                 file_path = os.path.join(cell_dir, file)
                 try:
-                    file_mtime = os.path.getmtime(file_path)
-                    file_timestamp = datetime.datetime.fromtimestamp(file_mtime)
-                    
-                    # Ignorar arquivos criados antes do último reset (se houver)
-                    if last_reset_timestamp and file_timestamp < last_reset_timestamp:
-                        logging.debug(f"Ignorando arquivo anterior ao reset: {file}")
-                        continue
-                    
                     with open(file_path, 'r') as f:
                         setup_data = json.load(f)
                     
-                    # Extrair informações relevantes para ordenação
+                    # Extrair informações relevantes
                     order_number = setup_data.get('order_number')
                     setup_type = setup_data.get('setup_type')
-                    timestamp = setup_data.get('timestamp')
                     
                     # Atualizar most_recent_order se necessário
                     if order_number and (most_recent_order is None or order_number > most_recent_order):
@@ -1723,18 +1661,12 @@ def api_get_cell_name(qrcode):
                     
                     # Adicionar à lista para análise posterior
                     setup_files.append({
-                        'path': file_path,
                         'order_number': order_number,
-                        'setup_type': setup_type,
-                        'timestamp': timestamp,
-                        'file_mtime': file_mtime
+                        'setup_type': setup_type
                     })
                     
                 except Exception as e:
                     logging.error(f"Erro ao ler arquivo de setup {file_path}: {e}")
-        
-        # Ordenar por timestamp (mais recente primeiro)
-        setup_files.sort(key=lambda x: x['file_mtime'], reverse=True)
         
         # Filtrar apenas os arquivos da ordem mais recente, se houver
         if most_recent_order and setup_files:
@@ -1753,7 +1685,8 @@ def api_get_cell_name(qrcode):
         "success": True,
         "cell_name": cell_name,
         "setup_status": setup_status,
-        "most_recent_order": most_recent_order
+        "most_recent_order": most_recent_order,
+        "message": "Lembre-se: Qualquer tipo de operação é permitido a qualquer momento."
     })
 
 @app.route('/api/update_setup', methods=['POST'])
@@ -2165,14 +2098,18 @@ def get_setup_images(cell_name, order_number, setup_type):
         })
 
 def reset_cell_flow(cell_name, reason):
-    """Reset the flow of a cell without deleting records.
+    """Registra um evento de reset para a célula por motivos de auditoria.
+    
+    Com a remoção da lógica de fluxo de célula, esta função agora apenas 
+    registra informações sobre resets para fins de histórico e auditoria,
+    sem impor restrições em operações futuras.
     
     Args:
-        cell_name: Nome da célula para resetar o fluxo
-        reason: Motivo para o reset do fluxo
+        cell_name: Nome da célula para o registro de reset
+        reason: Motivo para o registro
     
     Returns:
-        bool: True se o reset foi bem-sucedido, False caso contrário
+        bool: True se o registro foi bem-sucedido, False caso contrário
         str: Mensagem de status
     """
     if not cell_name or not reason:
@@ -2199,30 +2136,8 @@ def reset_cell_flow(cell_name, reason):
             "reset_timestamp": timestamp.replace('_', ' '),
             "reset_reason": reason,
             "reset_by": username,
-            "previous_state": {
-                "had_removal": False, 
-                "had_supply": False
-            }
+            "note": "Este é apenas um registro histórico. Não há mais restrições de fluxo."
         }
-        
-        # Verificar estado atual antes de resetar
-        cell_files = []
-        if os.path.isdir(cell_dir):
-            for file in os.listdir(cell_dir):
-                # Encontrar os arquivos de setup (não os de reset)
-                if file.endswith(".txt") and not file.startswith("reset_log_"):
-                    file_path = os.path.join(cell_dir, file)
-                    try:
-                        with open(file_path, 'r') as f:
-                            setup_data = json.load(f)
-                        
-                        setup_type = setup_data.get('setup_type')
-                        if setup_type == 'removal':
-                            reset_data["previous_state"]["had_removal"] = True
-                        elif setup_type == 'supply':
-                            reset_data["previous_state"]["had_supply"] = True
-                    except Exception as e:
-                        logging.error(f"Erro ao ler arquivo durante reset: {file_path}: {e}")
         
         # Registrar o reset
         with open(reset_file_path, 'w') as f:
@@ -2250,10 +2165,10 @@ def reset_cell_flow(cell_name, reason):
         with open(history_file, 'w') as f:
             json.dump(history, f)
         
-        return True, "Fluxo da célula resetado com sucesso"
+        return True, "Evento registrado com sucesso (não há mais restrições de fluxo)"
     except Exception as e:
-        logging.error(f"Erro ao resetar o fluxo da célula: {e}")
-        return False, f"Erro ao resetar célula: {str(e)}"
+        logging.error(f"Erro ao registrar evento para célula: {e}")
+        return False, f"Erro ao registrar evento: {str(e)}"
         
 @app.route("/api/reset_cell", methods=["POST"])
 def api_reset_cell():
