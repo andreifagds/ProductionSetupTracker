@@ -115,20 +115,7 @@
                                 </div>
                             </div>
                             
-                            <!-- Reset Cell Flow Button (apenas para auditores) -->
-                            {% if user_profile == 'auditor' %}
-                            <div class="row mt-4">
-                                <div class="col-12 text-center">
-                                    <button id="resetCellFlowBtn" class="btn btn-warning">
-                                        <i class="fa fa-refresh me-2"></i> Resetar Fluxo da Célula
-                                    </button>
-                                    <div class="small text-muted mt-2">
-                                        <i class="fa fa-info-circle me-1"></i> 
-                                        Esta opção permite que você reset o fluxo da célula, liberando todas as operações
-                                    </div>
-                                </div>
-                            </div>
-                            {% endif %}
+                            <!-- Sem botão de reset - restrições de fluxo removidas -->
                         </div>
                     </div>
                 </div>
@@ -752,38 +739,4 @@
 </body>
 </html>
 
-    <!-- Modal de Registro de Evento -->
-    <div class="modal fade" id="resetCellModal" tabindex="-1" aria-labelledby="resetCellModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header bg-info text-dark">
-                    <h5 class="modal-title" id="resetCellModalLabel">
-                        <i class="fa fa-info-circle me-2"></i> Registrar Evento para Célula
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="alert alert-info">
-                        <i class="fa fa-info-circle me-2"></i>
-                        <strong>Informação:</strong> Esta função agora apenas registra um evento para a célula. Não há mais restrições de fluxo, e qualquer operação pode ser realizada a qualquer momento.
-                    </p>
-                    
-                    <p>Célula: <strong id="resetCellName"></strong></p>
-                    
-                    <div class="mb-3">
-                        <label for="resetReason" class="form-label">Motivo do Registro (obrigatório)</label>
-                        <textarea class="form-control" id="resetReason" rows="3" required></textarea>
-                        <div class="invalid-feedback">
-                            Por favor, informe o motivo do registro para esta célula.
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-info" id="confirmResetBtn">
-                        <i class="fa fa-save me-2"></i> Registrar Evento
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Modal de registro de evento removido - não é mais necessário com a remoção das restrições de fluxo -->

@@ -13,82 +13,8 @@ document.addEventListener('DOMContentLoaded', function() {
         return new bootstrap.Popover(popoverTriggerEl)
     });
 
-    // Reset Cell Flow Button Functionality
-    const resetCellFlowBtn = document.getElementById('resetCellFlowBtn');
-    if (resetCellFlowBtn) {
-        resetCellFlowBtn.addEventListener('click', function() {
-            // Get cell name from the header or hidden field
-            const cellName = document.getElementById('cellNameHeader').textContent || 
-                           document.getElementById('cellNameTypeSelection').textContent;
-            
-            // Update modal with cell name
-            document.getElementById('resetCellName').textContent = cellName;
-            
-            // Show the reset modal
-            const resetCellModal = new bootstrap.Modal(document.getElementById('resetCellModal'));
-            resetCellModal.show();
-        });
-        
-        // Handle reset confirmation
-        const confirmResetBtn = document.getElementById('confirmResetBtn');
-        if (confirmResetBtn) {
-            confirmResetBtn.addEventListener('click', function() {
-                const resetReason = document.getElementById('resetReason');
-                const cellName = document.getElementById('resetCellName').textContent;
-                
-                // Verificar se o motivo foi preenchido
-                if (!resetReason.value.trim()) {
-                    resetReason.classList.add('is-invalid');
-                    return;
-                }
-                
-                resetReason.classList.remove('is-invalid');
-                
-                // Mostrar indicador de carregamento
-                const originalBtnText = confirmResetBtn.innerHTML;
-                confirmResetBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processando...';
-                confirmResetBtn.disabled = true;
-                
-                // Enviar requisição à API
-                fetch('/api/reset_cell', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        cell_name: cellName,
-                        reset_reason: resetReason.value
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Fechar modal
-                        bootstrap.Modal.getInstance(document.getElementById('resetCellModal')).hide();
-                        
-                        // Exibir mensagem de sucesso
-                        alert(data.message);
-                        
-                        // Atualizar a página para refletir o novo estado
-                        location.reload();
-                    } else {
-                        throw new Error(data.message || 'Erro ao resetar fluxo da célula');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    
-                    // Exibir mensagem de erro
-                    alert('Erro: ' + (error.message || 'Falha ao resetar fluxo da célula'));
-                })
-                .finally(() => {
-                    // Restaurar botão
-                    confirmResetBtn.innerHTML = originalBtnText;
-                    confirmResetBtn.disabled = false;
-                });
-            });
-        }
-    }
+    // Funcionalidade de reset do fluxo de célula removida
+    // Não há mais necessidade desta função após a remoção das restrições de fluxo
 
     // Setup form validation
     const setupForm = document.getElementById('setupForm');
