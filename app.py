@@ -1888,7 +1888,54 @@ def api_mark_as_audited():
     
     return jsonify({"success": False, "message": "Erro ao alterar status da auditoria"}), 500
 
-def delete_setup(cell_name, order_number, setup_type):
+def log_deletion(cell_name, order_number, setup_type, username, setup_data=None):
+    """Registra um log de exclusão no arquivo deletion_history.json.
+    
+    Args:
+        cell_name: Nome da célula
+        order_number: Número da ordem
+        setup_type: Tipo de setup (supply ou removal)
+        username: Nome do usuário que fez a exclusão
+        setup_data: Dados do setup que foi excluído (opcional)
+    """
+    deletion_log_file = os.path.join(DATA_DIR, "deletion_history.json")
+    
+    # Criar a estrutura do log
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    log_entry = {
+        "timestamp": timestamp,
+        "cell_name": cell_name,
+        "order_number": order_number,
+        "setup_type": setup_type,
+        "deleted_by": username,
+        "setup_data": setup_data
+    }
+    
+    # Carregar histórico existente ou criar novo
+    if os.path.exists(deletion_log_file):
+        try:
+            with open(deletion_log_file, 'r') as f:
+                try:
+                    history = json.load(f)
+                except json.JSONDecodeError:
+                    history = []
+        except Exception as e:
+            logging.error(f"Erro ao ler arquivo de histórico de exclusões: {e}")
+            history = []
+    else:
+        history = []
+    
+    # Adicionar nova entrada e salvar
+    history.append(log_entry)
+    
+    try:
+        with open(deletion_log_file, 'w') as f:
+            json.dump(history, f, indent=2)
+        logging.info(f"Log de exclusão registrado para {cell_name}/{order_number}_{setup_type}")
+    except Exception as e:
+        logging.error(f"Erro ao salvar histórico de exclusões: {e}")
+
+def delete_setup(cell_name, order_number, setup_type, username=None):
     """Delete a setup entry and its related image."""
     cell_dir = os.path.join(DATA_DIR, cell_name)
     
@@ -1899,6 +1946,17 @@ def delete_setup(cell_name, order_number, setup_type):
     prefix = f"{order_number}_{setup_type}"
     success = False
     files_to_delete = []
+    
+    # Carregar dados do setup para o histórico antes de excluir
+    setup_data = None
+    for file in os.listdir(cell_dir):
+        if file.startswith(prefix) and file.endswith(".txt"):
+            try:
+                with open(os.path.join(cell_dir, file), 'r') as f:
+                    setup_data = json.load(f)
+                break
+            except Exception as e:
+                logging.error(f"Erro ao ler dados do setup para histórico: {e}")
     
     # Encontrar todos os arquivos TXT e JPG relacionados
     for file in os.listdir(cell_dir):
@@ -1967,9 +2025,27 @@ def api_delete_setup():
     if not all([cell_name, order_number, setup_type]):
         return jsonify({"success": False, "message": "Dados incompletos para exclusão"}), 400
     
+    # Buscar os dados do setup antes de excluir para o histórico
+    cell_dir = os.path.join(DATA_DIR, cell_name)
+    prefix = f"{order_number}_{setup_type}"
+    setup_data = None
+    
+    if os.path.isdir(cell_dir):
+        for file in os.listdir(cell_dir):
+            if file.startswith(prefix) and file.endswith(".txt"):
+                try:
+                    with open(os.path.join(cell_dir, file), 'r') as f:
+                        setup_data = json.load(f)
+                    break
+                except Exception as e:
+                    logging.error(f"Erro ao ler dados do setup para histórico: {e}")
+    
+    # Executar a exclusão
     success = delete_setup(cell_name, order_number, setup_type)
     
     if success:
+        # Registrar no histórico de exclusões
+        log_deletion(cell_name, order_number, setup_type, username, setup_data)
         return jsonify({"success": True, "message": "Registro excluído com sucesso"})
     else:
         return jsonify({"success": False, "message": "Erro ao excluir o registro"}), 500
