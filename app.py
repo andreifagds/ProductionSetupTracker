@@ -2540,6 +2540,55 @@ def api_delete_item():
     
     return jsonify({"success": False, "message": "Erro ao excluir item. Célula ou produto não encontrado."}), 404
 
+# Funções para o histórico de exclusões
+def get_deletion_history():
+    """Obtém o histórico de exclusões do arquivo deletion_history.json.
+    
+    Returns:
+        list: Lista contendo o histórico de exclusões, ordenado por timestamp (mais recente primeiro).
+              Retorna lista vazia se não houver histórico ou ocorrer erro.
+    """
+    deletion_log_file = os.path.join(DATA_DIR, "deletion_history.json")
+    
+    if not os.path.exists(deletion_log_file):
+        logging.debug("Arquivo de histórico de exclusões não encontrado")
+        return []
+    
+    try:
+        with open(deletion_log_file, 'r') as f:
+            try:
+                history = json.load(f)
+                # Ordenar por timestamp (mais recente primeiro)
+                history.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+                return history
+            except json.JSONDecodeError:
+                logging.error("Erro ao decodificar o arquivo de histórico de exclusões")
+                return []
+    except Exception as e:
+        logging.error(f"Erro ao ler arquivo de histórico de exclusões: {e}")
+        return []
+
+@app.route('/deletion_history')
+def deletion_history():
+    """Exibe a página de histórico de exclusões."""
+    if not session.get('logged_in'):
+        flash('Você precisa fazer login para acessar esta página', 'danger')
+        return redirect(url_for('login'))
+    
+    # Verificar se o usuário tem perfil de auditor
+    username = session.get('username')
+    users = get_users()
+    user_profile = users.get(username, {}).get('profile', 'supplier')
+    
+    if user_profile != 'auditor':
+        flash('Acesso restrito a auditores', 'danger')
+        return redirect(url_for('index'))
+    
+    # Obter histórico de exclusões
+    history = get_deletion_history()
+    
+    return render_template('deletion_history.html', deletion_history=history)
+
 # Chamar a função de atualização do formato de QR codes ao iniciar
 with app.app_context():
     update_qrcodes_format()
