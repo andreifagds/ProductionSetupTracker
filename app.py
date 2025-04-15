@@ -688,7 +688,7 @@ def save_setup(cell_name, order_number, supplier_name, photo_data, observation, 
         verification_check: Se a verificação foi realizada
         product_code: (Opcional) Código do produto selecionado (apenas para abastecimento)
         product_name: (Opcional) Nome do produto selecionado (apenas para abastecimento)
-        product_po: (Opcional) PO do fornecedor para o produto (apenas para abastecimento)
+        product_po: (Removido) Não é mais utilizado
         selected_items: (Opcional) Lista de itens selecionados com seus POs de fornecedor (apenas para abastecimento)
         setup_type: Tipo de setup ('removal' para retirada, 'supply' para abastecimento)
     """
@@ -724,9 +724,7 @@ def save_setup(cell_name, order_number, supplier_name, photo_data, observation, 
         data["product_code"] = product_code
         data["product_name"] = product_name
         
-        # Adicionar PO do fornecedor para o produto se houver
-        if product_po:
-            data["product_po"] = product_po
+        # PO do fornecedor para o produto foi removido
         
         # Adicionar itens selecionados se houver
         # Verificação e conversão para garantir que selected_items é uma lista válida
@@ -1265,7 +1263,7 @@ def setup():
         # Obter dados específicos de produto e itens (para tipo de setup 'supply')
         product_code = request.form.get('product_code')
         product_name = request.form.get('product_name')
-        product_po = request.form.get('product_po')  # PO do fornecedor para o produto
+        # Campo product_po removido
         selected_items_json = request.form.get('selected_items')
         selected_items = []
         
@@ -1302,7 +1300,6 @@ def setup():
             # Garantir que esses campos não causem problemas quando não preenchidos
             product_code = None
             product_name = None
-            product_po = None
             selected_items = []
         
         # Converter string JSON para lista de imagens, se for JSON
@@ -1326,7 +1323,6 @@ def setup():
             verification_check,
             product_code=product_code if setup_type == 'supply' else None,
             product_name=product_name if setup_type == 'supply' else None,
-            product_po=product_po if setup_type == 'supply' else None,
             selected_items=selected_items if setup_type == 'supply' else None,
             setup_type=setup_type
         )
