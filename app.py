@@ -676,7 +676,7 @@ def get_cell_name(qrcode_value):
         logging.error(f"get_cell_name: Unknown cell format for QR code {qrcode_value}: {type(cell_data)}")
         return None
 
-def save_setup(cell_name, order_number, supplier_name, photo_data, observation, verification_check, product_code=None, product_name=None, product_po=None, selected_items=None, setup_type="supply"):
+def save_setup(cell_name, order_number, supplier_name, photo_data, observation, verification_check, product_code=None, product_name=None, selected_items=None, setup_type="supply"):
     """Save setup data to a text file and the photo as an image file.
     
     Args:
